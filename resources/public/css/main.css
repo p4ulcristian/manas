@@ -714,6 +714,13 @@ img { display: block; max-width: 100%; }
   0%, 100% { fill-opacity: 0.55; transform: scale(1); }
   50%      { fill-opacity: 1.0;  transform: scale(1.015); }
 }
+@keyframes gradient-shift {
+  0%, 100% { stop-color: #c9a84c; }
+  50%      { stop-color: #52b788; }
+}
+.place-grad-inner {
+  animation: gradient-shift 10s ease-in-out infinite;
+}
 .place-area {
   animation: place-pulse 12s ease-in-out infinite;
   transform-origin: center;

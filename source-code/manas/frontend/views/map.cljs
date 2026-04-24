@@ -283,7 +283,7 @@
     [:radialGradient {:id            (str "grad-" (:id p))
                       :gradientUnits "userSpaceOnUse"
                       :cx cx :cy cy :r (* r 1.4)}
-     [:stop {:offset "0%"   :stop-color "#c9a84c" :stop-opacity "0.38"}]
+     [:stop {:class "place-grad-inner" :offset "0%" :stop-color "#c9a84c" :stop-opacity "0.38"}]
      [:stop {:offset "100%" :stop-color "#c9a84c" :stop-opacity "0"}]]))
 
 (defn- place-svg-area [p d]
