@@ -267,7 +267,7 @@
    [:filter {:id "amorph" :x "-25%" :y "-25%" :width "150%" :height "150%"}
     [:feTurbulence {:type "fractalNoise" :baseFrequency "0.009" :numOctaves "3" :result "noise"}
      [:animate {:attributeName "seed" :from "0" :to "300"
-                :dur "14s" :repeatCount "indefinite"}]]
+                :dur "60s" :repeatCount "indefinite"}]]
     [:feDisplacementMap {:in "SourceGraphic" :in2 "noise"
                          :scale "18" :xChannelSelector "R" :yChannelSelector "G"}]]])
 

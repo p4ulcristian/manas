@@ -715,7 +715,7 @@ img { display: block; max-width: 100%; }
   50%      { fill-opacity: 0.28; }
 }
 .place-area {
-  animation: place-pulse 6s ease-in-out infinite;
+  animation: place-pulse 16s ease-in-out infinite;
   cursor: pointer;
   pointer-events: all;
   transition: stroke-width 0.2s;
