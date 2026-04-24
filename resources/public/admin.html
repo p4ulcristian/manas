@@ -443,7 +443,7 @@ function savePlace() {
   p.description = document.getElementById('f-desc').value;
   fetch('/api/places/' + p.id, {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name: p.name, type: p.type, icon: p.icon, description: p.description})
+    body: JSON.stringify({name: p.name, type: p.type, icon: p.icon, description: p.description, path: p.path || []})
   }).then(function() { renderSvg(); renderPlaceList(); setStatus('Saved ' + p.name); })
     .catch(function() { setStatus('Save failed', true); });
 }
