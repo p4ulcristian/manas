@@ -165,7 +165,13 @@
                  :left     (:x p)
                  :top      (:y p)
                  :transform "translate(-50%,-50%)"}
-      :on-click (fn [e] (.stopPropagation e) (reset! modal-day nil) (reset! modal-place p))}]))
+      :on-click (fn [e] (.stopPropagation e) (reset! modal-day nil) (reset! modal-place p))}
+     [:span.sparkle.s1]
+     [:span.sparkle.s2]
+     [:span.sparkle.s3]
+     [:span.sparkle.s4]
+     [:span.sparkle.s5]
+     [:span.sparkle.s6]]))
 
 ;; ── Transform clamping ───────────────────────────────────────────
 ;; Keeps the map on screen: if image fills viewport, allow full pan;
