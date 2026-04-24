@@ -262,13 +262,23 @@
    [:span.sparkle.s1] [:span.sparkle.s2] [:span.sparkle.s3]
    [:span.sparkle.s4] [:span.sparkle.s5] [:span.sparkle.s6]])
 
+(defn- amorph-filter []
+  [:defs
+   [:filter {:id "amorph" :x "-25%" :y "-25%" :width "150%" :height "150%"}
+    [:feTurbulence {:type "fractalNoise" :baseFrequency "0.009" :numOctaves "3" :result "noise"}
+     [:animate {:attributeName "seed" :from "0" :to "300"
+                :dur "14s" :repeatCount "indefinite"}]]
+    [:feDisplacementMap {:in "SourceGraphic" :in2 "noise"
+                         :scale "18" :xChannelSelector "R" :yChannelSelector "G"}]]])
+
 (defn- place-svg-area [p d]
   [:path {:key          (:id p)
+          :class        "place-area"
           :d            d
-          :fill         "rgba(201,168,76,0.18)"
+          :fill         "rgba(201,168,76,1)"
           :stroke       "#c9a84c"
           :stroke-width 3
-          :style        {:cursor "pointer" :pointer-events "all"}
+          :filter       "url(#amorph)"
           :on-click     (place-click-handler p)}])
 
 (defn place-areas []
@@ -280,6 +290,7 @@
      [:svg {:style {:position "absolute" :left 0 :top 0
                     :width img-w :height img-h
                     :overflow "visible" :pointer-events "none"}}
+      [amorph-filter]
       (for [p with-path]
         [place-svg-area p (catmull-rom-path (:path p))])]]))
 
