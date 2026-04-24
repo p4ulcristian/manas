@@ -730,7 +730,7 @@ img { display: block; max-width: 100%; }
 /* ── Place modal sheet ── */
 .place-modal {
   position: fixed; inset: 0; z-index: 999;
-  background: rgba(0,0,0,0.45);
+  background: transparent;
   display: flex; align-items: flex-end;
   pointer-events: none;
 }
@@ -744,7 +744,10 @@ img { display: block; max-width: 100%; }
   border-radius: 18px 18px 0 0;
   padding: 24px 20px 32px;
   position: relative;
-  min-height: 420px;
+  height: 420px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   animation: slide-up 0.22s ease;
 }
 @keyframes slide-up {

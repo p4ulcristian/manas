@@ -3,8 +3,8 @@
  :dependencies [[reagent "2.0.1"]
                 [cljs-http "0.1.49"]]
 
- :nrepl {:port #shadow/env ["NREPL_CLJS" :default 9631]}
- :http  {:port #shadow/env ["MANAS_SHADOW_PORT" :default 9641]}
+ :nrepl {:port 9643 :host "0.0.0.0"}
+ :http  {:port 9642 :host "0.0.0.0"}
 
  :builds
  {:app

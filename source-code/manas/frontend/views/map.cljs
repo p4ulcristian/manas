@@ -258,16 +258,17 @@
                                  (js/Math.sqrt (+ (* (- x cx) (- x cx))
                                                   (* (- y cy) (- y cy)))))
                                pts))]
-    [:radialGradient {:id            (str "grad-" (:id p))
+    [:radialGradient {:key           (str "grad-" (:id p))
+                      :id            (str "grad-" (:id p))
                       :gradientUnits "userSpaceOnUse"
                       :cx cx :cy cy :r (* r 1.4)}
-     [:stop {:offset "0%" :stop-color "#00a896" :stop-opacity "0.42"}
+     [:stop {:key "s0" :offset "0%" :stop-color "#00a896" :stop-opacity "0.42"}
      [:animate {:attributeName "stop-color"
                 :values "#00a896;#00d4aa;#00a896"
                 :dur "10s" :calcMode "spline"
                 :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
                 :repeatCount "indefinite"}]]
-     [:stop {:offset "100%" :stop-color "#00a896" :stop-opacity "0"}
+     [:stop {:key "s100" :offset "100%" :stop-color "#00a896" :stop-opacity "0"}
       [:animate {:attributeName "stop-color"
                  :values "#00a896;#00d4aa;#00a896"
                  :dur "10s" :calcMode "spline"
@@ -301,7 +302,7 @@
       (into [:defs [amorph-filter]]
             (map place-radial-gradient with-path))
       (for [p with-path]
-        [place-svg-area p (catmull-rom-path (:path p))])]]))
+        ^{:key (:id p)} [place-svg-area p (catmull-rom-path (:path p))])]]))
 
 ;; ── Bottom nav ───────────────────────────────────────────────────
 (defn nav-menu []
@@ -491,6 +492,28 @@
               (fn [_]
                 (swap! touch-ref assoc :dragging false :pinching false))
 
+              on-mouse-down
+              (fn [e]
+                (swap! touch-ref assoc
+                       :dragging true :pinching false :mouse-moved false
+                       :last-x (.-clientX e) :last-y (.-clientY e)))
+
+              on-mouse-move
+              (fn [e]
+                (when (:dragging @touch-ref)
+                  (let [cx (.-clientX e) cy (.-clientY e)
+                        dx (- cx (:last-x @touch-ref))
+                        dy (- cy (:last-y @touch-ref))]
+                    (swap! touch-ref assoc :last-x cx :last-y cy :mouse-moved true)
+                    (swap! transform (fn [{:keys [x y scale]}]
+                                       (clamp-transform {:scale scale :x (+ x dx) :y (+ y dy)}))))))
+
+              on-mouse-up
+              (fn [_] (swap! touch-ref assoc :dragging false))
+
+              on-mouse-leave
+              (fn [_] (swap! touch-ref assoc :dragging false))
+
               start-gps
               (fn []
                 (swap! state assoc :gps-status :loading)
@@ -539,11 +562,17 @@
            [:div.map-viewport
             {:ref            #(reset! node-ref %)
              :on-touch-start on-touch-start
-             :on-touch-end   on-touch-end}
+             :on-touch-end   on-touch-end
+             :on-mouse-down  on-mouse-down
+             :on-mouse-move  on-mouse-move
+             :on-mouse-up    on-mouse-up
+             :on-mouse-leave on-mouse-leave
+             :style          {:cursor (if (:dragging @touch-ref) "grabbing" "grab")}}
             [:div.map-world
              {:style {:transform (str "translate(" x "px," y "px) scale(" scale ")")
                       :transform-origin "0 0"
-                      :width img-w :height img-h}}
+                      :width img-w :height img-h}
+              :on-click #(when (and @modal-place (not (:mouse-moved @touch-ref))) (close-modal!))}
              [:img {:src (str "/images/festival-map.png?v=" @map-ver)
                     :width img-w :height img-h
                     :draggable false

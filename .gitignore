@@ -1,0 +1,7 @@
+.env
+.env.dev
+.manas.pid
+.shadow-cljs/
+resources/public/js/core/
+node_modules/
+target/
