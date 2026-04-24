@@ -264,13 +264,10 @@
 
 (defn- amorph-filter []
   [:filter {:id "amorph" :x "-40%" :y "-40%" :width "180%" :height "180%"}
-   [:feTurbulence {:type "fractalNoise" :baseFrequency "0.009" :numOctaves "3" :result "noise"}]
-   [:feDisplacementMap {:in "SourceGraphic" :in2 "noise" :scale "18"
-                        :xChannelSelector "R" :yChannelSelector "G" :result "warped"}]
-   [:feGaussianBlur {:in "warped" :stdDeviation "22" :result "glow"}]
+   [:feGaussianBlur {:in "SourceGraphic" :stdDeviation "22" :result "glow"}]
    [:feMerge
     [:feMergeNode {:in "glow"}]
-    [:feMergeNode {:in "warped"}]]])
+    [:feMergeNode {:in "SourceGraphic"}]]])
 
 (defn- centroid [pts]
   [(/ (apply + (map first pts)) (count pts))
