@@ -98,6 +98,12 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
       </select>
     </div>
     <div><label>Icon</label><input id="f-icon" type="text" placeholder="♪ ◈ △ i" maxlength="4"></div>
+    <div>
+      <label>Image</label>
+      <div id="f-img-preview" style="margin-bottom:6px"></div>
+      <input type="file" id="f-img-input" accept="image/*" style="display:none" onchange="uploadPlaceImage()">
+      <button class="btn sec" onclick="document.getElementById('f-img-input').click()" style="font-size:.78rem">Upload Image</button>
+    </div>
     <div><label>Description</label><textarea id="f-desc" placeholder="Short description"></textarea></div>
     <div class="btn-row">
       <button class="btn" onclick="savePlace()">Save</button>
@@ -450,6 +456,10 @@ function selectPlace(id) {
     document.getElementById('f-type').value = p.type || 'other';
     document.getElementById('f-icon').value = p.icon || '';
     document.getElementById('f-desc').value = p.description || '';
+    var prev = document.getElementById('f-img-preview');
+    prev.innerHTML = p['image-url']
+      ? '<img src="' + p['image-url'] + '?t=' + Date.now() + '" style="width:100%;border-radius:6px;margin-bottom:4px">'
+      : '<span style="color:#666;font-size:.78rem">No image</span>';
   }
   renderPlaceList();
   renderSvg();
@@ -824,6 +834,36 @@ Promise.all([
 }).catch(function() { setStatus('Failed to load data', true); });
 
 switchTab('places');
+
+function uploadPlaceImage() {
+  if (!selectedPlace) { setStatus('Select a place first'); return; }
+  var file = document.getElementById('f-img-input').files[0];
+  if (!file) return;
+  setStatus('Uploading image...');
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    fetch('/api/places/' + selectedPlace + '/image', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({image: ev.target.result})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.url) {
+        setStatus('Image saved');
+        var p = places.find(function(x) { return x.id === selectedPlace; });
+        if (p) p['image-url'] = data.url;
+        var prev = document.getElementById('f-img-preview');
+        prev.innerHTML = '<img src="' + data.url + '?t=' + Date.now() + '" style="width:100%;border-radius:6px;margin-bottom:4px">';
+        document.getElementById('f-img-input').value = '';
+      } else {
+        setStatus('Error: ' + (data.error || 'unknown'));
+      }
+    })
+    .catch(function(e) { setStatus('Error: ' + e); });
+  };
+  reader.readAsDataURL(file);
+}
 </script>
 </body>
 </html>

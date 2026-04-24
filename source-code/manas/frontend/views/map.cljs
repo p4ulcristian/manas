@@ -162,19 +162,23 @@
        [:div.place-modal__sheet
         [:button.place-modal__close {:on-click close-modal!} "\u2715"]
         [:div.place-modal__header
-         [:span.place-modal__icon (or (:icon p) "O")]
+         (if (:image-url p)
+           [:img.place-modal__img {:src (:image-url p) :alt (:name p)}]
+           [:span.place-modal__icon (or (:icon p) "O")])
          [:span.place-modal__name (:name p)]]
-        (when (seq (:description p))
-          [:div.place-modal__place-desc (:description p)])
-        (when (seq dates)
-          [:div.place-modal__days
-           (for [d dates]
-             [:div.place-modal__day-tab
-              {:key      d
-               :class    (when (= d active) "active")
-               :on-click (fn [e] (.stopPropagation e) (reset! modal-day d))}
-              (get day-labels d d)])])
-        (modal-acts place-id active)]])))
+        [:div.place-modal__body
+         (when (seq (:description p))
+           [:div.place-modal__place-desc (:description p)])
+         (when (seq dates)
+           [:div.place-modal__days
+            (for [d dates]
+              [:div.place-modal__day-tab
+               {:key      d
+                :class    (when (= d active) "active")
+                :on-click (fn [e] (.stopPropagation e) (reset! modal-day d))}
+               [:span (get day-labels d d)]
+               [:span.place-modal__day-date (last (clojure.string/split d #"-"))]])])
+         (modal-acts place-id active)]]])))
 
 ;; ── Artist modal ──────────────────────────────────────────────────
 (defn artist-modal []

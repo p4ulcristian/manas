@@ -216,13 +216,32 @@
           places  (load-places)
           updated (mapv (fn [p]
                           (if (= (:id p) id)
-                            (merge p (select-keys body [:name :type :icon :path :description]))
+                            (merge p (select-keys body [:name :type :icon :path :description :image-url]))
                             p))
                         places)]
       (if (some #(= (:id %) id) places)
         (do (save-places! updated)
             (json-response (first (filter #(= (:id %) id) updated))))
         (json-response {:error "Not found"} :status 404)))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
+
+(defn- handle-upload-place-image [request id]
+  (try
+    (let [body  (json/parse-string (slurp (:body request)) true)
+          b64   (clojure.string/replace (:image body) #"^data:image/[^;]+;base64," "")
+          ext   (or (second (re-find #"^data:image/([^;]+);" (:image body))) "png")
+          bytes (.decode (Base64/getDecoder) b64)
+          dir   (File. (str project-root "/resources/public/images/places"))
+          _     (.mkdirs dir)
+          fname (str id "." ext)
+          path  (Paths/get (str project-root "/resources/public/images/places/" fname) (into-array String []))
+          _     (Files/write path bytes (into-array java.nio.file.OpenOption []))
+          url   (str "/images/places/" fname)
+          places  (load-places)
+          updated (mapv #(if (= (:id %) id) (assoc % :image-url url) %) places)]
+      (save-places! updated)
+      (json-response {:url url}))
     (catch Exception e
       (json-response {:error (.getMessage e)} :status 400))))
 
@@ -284,6 +303,9 @@
 
       (and (clojure.string/starts-with? uri "/api/places/") (= method :put))
       (handle-put-place request (subs uri (count "/api/places/")))
+
+      (and (re-matches #"/api/places/[^/]+/image" uri) (= method :post))
+      (handle-upload-place-image request (second (re-find #"/api/places/([^/]+)/image" uri)))
 
       (and (clojure.string/starts-with? uri "/api/places/") (= method :delete))
       (handle-delete-place (subs uri (count "/api/places/")))

@@ -3,9 +3,12 @@ if((typeof manas !== 'undefined') && (typeof manas.frontend !== 'undefined') && 
 } else {
 manas.frontend.app.root = cljs.core.atom.cljs$core$IFn$_invoke$arity$1(null);
 }
+manas.frontend.app.dev_mode_QMARK_ = (function manas$frontend$app$dev_mode_QMARK_(){
+return cljs.core._EQ_.cljs$core$IFn$_invoke$arity$2(window.location.pathname,"/dev");
+});
 manas.frontend.app.render_app_BANG_ = (function manas$frontend$app$render_app_BANG_(){
 if(cljs.core.truth_(cljs.core.deref(manas.frontend.app.root))){
-return reagent.dom.client.render.cljs$core$IFn$_invoke$arity$2(cljs.core.deref(manas.frontend.app.root),new cljs.core.PersistentVector(null, 1, 5, cljs.core.PersistentVector.EMPTY_NODE, [manas.frontend.views.map.map_section], null));
+return reagent.dom.client.render.cljs$core$IFn$_invoke$arity$2(cljs.core.deref(manas.frontend.app.root),new cljs.core.PersistentVector(null, 2, 5, cljs.core.PersistentVector.EMPTY_NODE, [manas.frontend.views.map.map_section,new cljs.core.PersistentArrayMap(null, 1, [new cljs.core.Keyword(null,"dev?","dev?",-613971064),manas.frontend.app.dev_mode_QMARK_()], null)], null));
 } else {
 return null;
 }
