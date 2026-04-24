@@ -1,0 +1,14 @@
+{
+  "name": "manas",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bunx shadow-cljs watch app",
+    "release": "bunx shadow-cljs release app"
+  },
+  "devDependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "shadow-cljs": "^3.3.6"
+  }
+}

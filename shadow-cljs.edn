@@ -1,0 +1,28 @@
+{:source-paths ["source-code"]
+ :deps true
+ :dependencies [[reagent "2.0.1"]
+                [cljs-http "0.1.49"]]
+
+ :nrepl {:port #shadow/env ["NREPL_CLJS" :default 9631]}
+ :http  {:port #shadow/env ["MANAS_SHADOW_PORT" :default 9641]}
+
+ :builds
+ {:app
+  {:target     :browser
+   :output-dir "resources/public/js/core"
+   :asset-path "/js/core"
+   :modules    {:main {:init-fn manas.frontend.app/start-app!}}
+   :compiler-options
+   {:closure-defines
+    {shadow.cljs.devtools.client.env/devtools-url
+     #shadow/env ["MANAS_SHADOW_DEVTOOLS_URL" :default "http://localhost:9641"]}}
+   :devtools {:after-load  manas.frontend.app/render-app!
+              :devtools-url #shadow/env ["MANAS_SHADOW_DEVTOOLS_URL" :default "http://localhost:9641"]}
+   :build-hooks [[build.version-hook/hook]]}
+
+  :release
+  {:target      :browser
+   :output-dir  "resources/public/js/core"
+   :asset-path  "/js/core"
+   :modules     {:main {:init-fn manas.frontend.app/start-app!}}
+   :build-hooks [[build.version-hook/hook]]}}}

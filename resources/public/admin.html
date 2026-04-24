@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Place Editor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+#toolbar { display:flex; gap:12px; align-items:center; padding:10px 16px; background:#111; border-bottom:1px solid #333; flex-wrap:wrap; }
+#toolbar h1 { font-size:1rem; color:#c9a84c; }
+.hint { font-size:.8rem; color:#888; }
+#status { font-size:.78rem; color:#6ab04c; min-height:18px; }
+#main { display:flex; flex:1; overflow:hidden; }
+#map-area { flex:1; overflow:auto; padding:16px; }
+#map-wrap { position:relative; display:inline-block; cursor:crosshair; }
+#map-img { display:block; max-width:none; }
+.place-dot { position:absolute; width:24px; height:24px; border-radius:50%; background:rgba(201,168,76,0.85); border:2px solid #fff; transform:translate(-50%,-50%); cursor:grab; display:flex; align-items:center; justify-content:center; font-size:9px; color:#111; font-weight:700; text-align:center; user-select:none; }
+.place-dot:active { cursor:grabbing; }
+.place-dot.selected { background:rgba(255,100,100,0.9); border-color:#ff4444; }
+#sidebar { width:260px; background:#111; border-left:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+#sidebar h2 { font-size:.9rem; color:#c9a84c; margin-bottom:4px; }
+#sidebar label { font-size:.78rem; color:#aaa; display:block; margin-bottom:3px; }
+#sidebar input, #sidebar select { width:100%; background:#222; border:1px solid #444; color:#eee; padding:7px 10px; border-radius:6px; font-size:.85rem; }
+#sidebar hr { border-color:#333; }
+.btn { background:#c9a84c; color:#111; border:none; padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.85rem; font-weight:600; }
+.btn:hover { background:#e0be6a; }
+.btn.del { background:#e55; color:#fff; }
+.btn.del:hover { background:#ff6666; }
+.btn-row { display:flex; gap:8px; }
+#place-list { display:flex; flex-direction:column; gap:6px; }
+.place-item { background:#1e1e1e; border:1px solid #333; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:.82rem; }
+.place-item:hover { border-color:#c9a84c; }
+.place-item.selected { border-color:#ff4444; }
+.place-item .pname { font-weight:600; }
+.place-item .pcoords { color:#666; font-size:.75rem; }
+#zoom-ctrl { display:flex; gap:6px; align-items:center; }
+#zoom-ctrl button { background:#222; color:#eee; border:1px solid #444; width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:1rem; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <h1>Place Editor</h1>
+  <span class="hint">Click map to add &middot; Drag dot to reposition &middot; Select to edit/delete</span>
+  <div id="zoom-ctrl">
+    <button onclick="zoom(-0.25)">&#8722;</button>
+    <span id="zoom-label" style="font-size:.8rem;color:#888">100%</span>
+    <button onclick="zoom(0.25)">+</button>
+  </div>
+  <div id="status"></div>
+</div>
+<div id="main">
+  <div id="map-area">
+    <div id="map-wrap">
+      <img id="map-img" src="/images/festival-map.png" draggable="false">
+    </div>
+  </div>
+  <div id="sidebar">
+    <h2>Places</h2>
+    <div id="place-list"></div>
+    <hr>
+    <h2>Edit selected</h2>
+    <div><label>Name</label><input id="f-name" type="text" placeholder="e.g. Portal"></div>
+    <div><label>Type</label>
+      <select id="f-type">
+        <option value="stage">Stage</option>
+        <option value="bar">Bar</option>
+        <option value="food">Food</option>
+        <option value="portal">Portal</option>
+        <option value="camping">Camping</option>
+        <option value="info">Info</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div><label>Icon (emoji/symbol)</label><input id="f-icon" type="text" placeholder="♪ ◈ △ i" maxlength="4"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="saveSelected()">Save</button>
+      <button class="btn del" onclick="deleteSelected()">Delete</button>
+    </div>
+  </div>
+</div>
+<script>
+var IMG_W = 1440, IMG_H = 1920;
+var places = [];
+var selected = null;
+var scale = 0.5;
+
+function setScale(s) {
+  scale = Math.max(0.1, Math.min(3, s));
+  var img = document.getElementById('map-img');
+  img.style.width  = (IMG_W * scale) + 'px';
+  img.style.height = (IMG_H * scale) + 'px';
+  document.getElementById('zoom-label').textContent = Math.round(scale * 100) + '%';
+  render();
+}
+
+function zoom(delta) { setScale(scale + delta); }
+
+function status(msg, err) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = err ? '#e55' : '#6ab04c';
+}
+
+function render() {
+  document.querySelectorAll('.place-dot').forEach(function(d) { d.remove(); });
+  var wrap = document.getElementById('map-wrap');
+  places.forEach(function(p) {
+    var dot = document.createElement('div');
+    dot.className = 'place-dot' + (selected === p.id ? ' selected' : '');
+    dot.style.left = (p.x * scale) + 'px';
+    dot.style.top  = (p.y * scale) + 'px';
+    dot.title = p.name;
+    dot.textContent = (p.icon || p.name || '').substring(0, 3);
+    dot.dataset.id = p.id;
+    makeDraggable(dot, p);
+    dot.addEventListener('click', function(e) { e.stopPropagation(); selectPlace(p.id); });
+    wrap.appendChild(dot);
+  });
+  renderList();
+}
+
+function renderList() {
+  var list = document.getElementById('place-list');
+  list.innerHTML = '';
+  places.forEach(function(p) {
+    var item = document.createElement('div');
+    item.className = 'place-item' + (selected === p.id ? ' selected' : '');
+    item.innerHTML = '<div class="pname">' + (p.icon ? p.icon + ' ' : '') + (p.name || 'unnamed') + '</div>' +
+      '<div class="pcoords">x:' + Math.round(p.x) + ' y:' + Math.round(p.y) + ' &middot; ' + (p.type || '') + '</div>';
+    item.onclick = function() { selectPlace(p.id); };
+    list.appendChild(item);
+  });
+}
+
+function selectPlace(id) {
+  selected = id;
+  var p = places.find(function(x) { return x.id === id; });
+  if (p) {
+    document.getElementById('f-name').value = p.name || '';
+    document.getElementById('f-type').value = p.type || 'other';
+    document.getElementById('f-icon').value = p.icon || '';
+  }
+  render();
+}
+
+function makeDraggable(dot, p) {
+  var dragging = false, startX, startY, origX, origY;
+  dot.addEventListener('mousedown', function(e) {
+    e.preventDefault(); dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    origX = p.x; origY = p.y;
+    function onMove(ev) {
+      if (!dragging) return;
+      p.x = Math.round(Math.max(0, Math.min(IMG_W, origX + (ev.clientX - startX) / scale)));
+      p.y = Math.round(Math.max(0, Math.min(IMG_H, origY + (ev.clientY - startY) / scale)));
+      dot.style.left = (p.x * scale) + 'px';
+      dot.style.top  = (p.y * scale) + 'px';
+    }
+    function onUp() {
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      fetch('/api/places/' + p.id, {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({x: p.x, y: p.y})
+      }).then(function() { status('Moved ' + (p.name || p.id)); renderList(); })
+        .catch(function() { status('Move failed', true); });
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+document.getElementById('map-wrap').addEventListener('click', function(e) {
+  var img = document.getElementById('map-img');
+  var rect = img.getBoundingClientRect();
+  var x = Math.round((e.clientX - rect.left) / scale);
+  var y = Math.round((e.clientY - rect.top)  / scale);
+  fetch('/api/places', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: 'New Place', type: 'other', icon: '◉', x: x, y: y})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(p) { places.push(p); selectPlace(p.id); status('Added at ' + x + ',' + y); })
+  .catch(function() { status('Add failed', true); });
+});
+
+function saveSelected() {
+  var p = places.find(function(x) { return x.id === selected; });
+  if (!p) return;
+  p.name = document.getElementById('f-name').value;
+  p.type = document.getElementById('f-type').value;
+  p.icon = document.getElementById('f-icon').value;
+  fetch('/api/places/' + p.id, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: p.name, type: p.type, icon: p.icon})
+  }).then(function() { render(); status('Saved ' + p.name); })
+    .catch(function() { status('Save failed', true); });
+}
+
+function deleteSelected() {
+  if (!selected) return;
+  fetch('/api/places/' + selected, {method: 'DELETE'})
+  .then(function() {
+    places = places.filter(function(p) { return p.id !== selected; });
+    selected = null; render(); status('Deleted');
+  }).catch(function() { status('Delete failed', true); });
+}
+
+document.getElementById('map-img').onload = function() { setScale(0.5); };
+fetch('/api/places').then(function(r) { return r.json(); })
+  .then(function(data) { places = data; render(); status('Loaded ' + data.length + ' places'); })
+  .catch(function() { status('Failed to load places', true); });
+</script>
+</body>
+</html>
