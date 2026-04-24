@@ -556,7 +556,7 @@
              (place-areas)]]
            [place-modal]
            [artist-modal]
-           [nav-menu]
+           #_[nav-menu]
 
            (when dev?
              [:div.map-overlay__actions

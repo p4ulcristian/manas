@@ -111,7 +111,6 @@ cljs$core$PersistentArrayMapIterator:sf
 cljs$core$PersistentArrayMapSeq:rf
 cljs$core$PersistentHashMap:ag
 cljs$core$PersistentHashMap$EMPTY:xf
-cljs$core$PersistentHashMap$fromArrays:dh
 cljs$core$PersistentHashSet:lg
 cljs$core$PersistentHashSet$EMPTY:ng
 cljs$core$PersistentVector:X
@@ -502,24 +501,7 @@ cljs$cst$208$overflow:mm
 cljs$cst$209$pointer_events:gl
 cljs$cst$21$keywordize_keys:ah
 cljs$cst$210$defs:Ql
-cljs$cst$211$div_DOT_nav_menu:ej
-cljs$cst$212$svg_DOT_nav_blob_bg:xh
-cljs$cst$213$viewBox:em
-cljs$cst$214$preserveAspectRatio:Ei
-cljs$cst$215$feTurbulence:Cm
-cljs$cst$216$baseFrequency:ki
-cljs$cst$217$numOctaves:Km
-cljs$cst$218$feDisplacementMap:cj
-cljs$cst$219$in2:Bi
 cljs$cst$220$scale:Lm
-cljs$cst$221$xChannelSelector:Rm
-cljs$cst$222$yChannelSelector:Sh
-cljs$cst$223$rect:Uh
-cljs$cst$224$rx:gh
-cljs$cst$225$ry:vh
-cljs$cst$226$div_DOT_nav_buttons:yi
-cljs$cst$227$button_DOT_nav_btn:Ym
-cljs$cst$228$timetable:om
 cljs$cst$229$dev_QMARK_:qm
 cljs$cst$230$gps_status:Bh
 cljs$cst$231$idle:Zh
@@ -541,7 +523,6 @@ cljs$cst$246$on_touch_start:vi
 cljs$cst$247$on_touch_end:Wi
 cljs$cst$248$div_DOT_map_world:pi
 cljs$cst$249$transform_origin:Xi
-cljs$cst$25$type:Um
 cljs$cst$250$img:mi
 cljs$cst$251$src:hi
 cljs$cst$252$draggable:Bm
@@ -589,7 +570,6 @@ goog$typeOf:r
 goog$uidCounter_:ea
 id$jscomp$inline_844:Vl
 manas$frontend$app$root:Ol
-manas$frontend$views$map$active_nav:an
 manas$frontend$views$map$amorph_filter:xm
 manas$frontend$views$map$api_acts:ul
 manas$frontend$views$map$api_artists:tl
@@ -613,7 +593,6 @@ manas$frontend$views$map$modal_artist:wl
 manas$frontend$views$map$modal_closing:yl
 manas$frontend$views$map$modal_day:xl
 manas$frontend$views$map$modal_place:vl
-manas$frontend$views$map$nav_menu:bn
 manas$frontend$views$map$now_time:zl
 manas$frontend$views$map$place_areas:Ll
 manas$frontend$views$map$place_click_handler:$l

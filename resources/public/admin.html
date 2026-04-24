@@ -113,6 +113,33 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
   </div>
 </div>
 
+<!-- SIMULATION TAB -->
+<div id="tab-simulation" class="tab-panel">
+  <div id="sim-map-area" style="flex:1;overflow:auto;padding:16px">
+    <div id="sim-map-wrap" style="position:relative;display:inline-block">
+      <img id="sim-map-img" src="/images/festival-map.png" draggable="false" style="display:block;max-width:none">
+      <svg id="sim-map-svg" style="position:absolute;top:0;left:0;overflow:visible;pointer-events:none"></svg>
+    </div>
+  </div>
+  <div class="sidebar">
+    <h2>Simulation Path</h2>
+    <div style="font-size:.78rem;color:#aaa;margin-bottom:8px">Walk route for the Simulate button. Open polyline — start to end.</div>
+    <div id="sim-zoom-ctrl" style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <button style="background:#222;color:#eee;border:1px solid #444;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:1rem" onclick="simZoom(-0.25)">&#8722;</button>
+      <span id="sim-zoom-label" style="font-size:.8rem;color:#888">50%</span>
+      <button style="background:#222;color:#eee;border:1px solid #444;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:1rem" onclick="simZoom(0.25)">+</button>
+    </div>
+    <div id="sim-waypoint-count" style="font-size:.78rem;color:#666;margin-bottom:8px">0 waypoints</div>
+    <div class="btn-row">
+      <button id="sim-draw-btn" class="btn sec" onclick="toggleSimDraw()">Draw Path</button>
+      <button class="btn sec" onclick="clearSimRoute()">Clear</button>
+    </div>
+    <div style="font-size:.75rem;color:#666;margin-top:4px">Click map to add waypoints. Drag to adjust. Right-click to delete.</div>
+    <hr>
+    <button class="btn" onclick="saveSimRoute()">Save Route</button>
+  </div>
+</div>
+
 <!-- ARTISTS TAB -->
 <div id="tab-artists" class="tab-panel">
   <div class="full-panel">
@@ -184,11 +211,18 @@ function switchTab(name) {
   });
   document.getElementById('zoom-ctrl').style.display = name === 'places' ? 'flex' : 'none';
   var hints = {
-    places: 'Select place → Draw Path → click map to add vertices',
-    artists: 'Click an artist to edit, or add a new one',
-    acts: 'Click an act to edit, or add a new one'
+    places:     'Select place → Draw Path → click map to add vertices',
+    artists:    'Click an artist to edit, or add a new one',
+    acts:       'Click an act to edit, or add a new one',
+    simulation: 'Draw Path → click map to add walk waypoints → Save Route'
   };
   document.getElementById('toolbar-hint').textContent = hints[name] || '';
+  if (name !== 'simulation' && simDrawMode) {
+    simDrawMode = false;
+    var sb = document.getElementById('sim-draw-btn');
+    if (sb) { sb.textContent = 'Draw Path'; sb.className = 'btn sec'; }
+    document.getElementById('sim-map-wrap').style.cursor = 'default';
+  }
 }
 
 // ── zoom ─────────────────────────────────────────────────────
@@ -641,20 +675,151 @@ function deleteAct() {
   }).catch(function() { setStatus('Delete failed', true); });
 }
 
+// ── Simulation tab ───────────────────────────────────────────
+var SIM_IMG_W = 1440, SIM_IMG_H = 1920;
+var SIM_NORTH = 46.26629084547643, SIM_SOUTH = 46.25869538678212;
+var SIM_WEST  = 20.133819580078125, SIM_EAST  = 20.1434326171875;
+var simScale = 0.5;
+var simRoute = [];
+var simDrawMode = false;
+
+function pxToLng(px) { return SIM_WEST + (px / SIM_IMG_W) * (SIM_EAST - SIM_WEST); }
+function pyToLat(py) { return SIM_NORTH - (py / SIM_IMG_H) * (SIM_NORTH - SIM_SOUTH); }
+function lngToPx(lng) { return (lng - SIM_WEST) / (SIM_EAST - SIM_WEST) * SIM_IMG_W; }
+function latToPy(lat) { return (SIM_NORTH - lat) / (SIM_NORTH - SIM_SOUTH) * SIM_IMG_H; }
+
+function setSimScale(s) {
+  simScale = Math.max(0.1, Math.min(3, s));
+  var img = document.getElementById('sim-map-img');
+  var svg = document.getElementById('sim-map-svg');
+  img.style.width  = (SIM_IMG_W * simScale) + 'px';
+  img.style.height = (SIM_IMG_H * simScale) + 'px';
+  svg.style.width  = (SIM_IMG_W * simScale) + 'px';
+  svg.style.height = (SIM_IMG_H * simScale) + 'px';
+  svg.setAttribute('viewBox', '0 0 ' + SIM_IMG_W + ' ' + SIM_IMG_H);
+  document.getElementById('sim-zoom-label').textContent = Math.round(simScale * 100) + '%';
+  renderSimSvg();
+}
+function simZoom(delta) { setSimScale(simScale + delta); }
+
+function renderSimSvg() {
+  var svg = document.getElementById('sim-map-svg');
+  if (!svg) return;
+  svg.innerHTML = '';
+  document.getElementById('sim-waypoint-count').textContent = simRoute.length + ' waypoints';
+  if (simRoute.length < 1) return;
+
+  var pts = simRoute.map(function(p) { return [lngToPx(p[0]), latToPy(p[1])]; });
+
+  // polyline
+  if (pts.length >= 2) {
+    var poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    poly.setAttribute('points', pts.map(function(p) { return p[0] + ',' + p[1]; }).join(' '));
+    poly.setAttribute('fill', 'none');
+    poly.setAttribute('stroke', '#4a9eff');
+    poly.setAttribute('stroke-width', '4');
+    poly.setAttribute('stroke-dasharray', '12,6');
+    poly.setAttribute('stroke-linecap', 'round');
+    poly.style.pointerEvents = 'none';
+    svg.appendChild(poly);
+  }
+
+  // waypoint handles
+  pts.forEach(function(p, idx) {
+    var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', p[0]);
+    c.setAttribute('cy', p[1]);
+    c.setAttribute('r', (idx === 0 || idx === pts.length - 1) ? '14' : '9');
+    c.setAttribute('fill', idx === 0 ? 'rgba(74,200,100,0.85)' : idx === pts.length - 1 ? 'rgba(255,80,80,0.85)' : 'rgba(74,158,255,0.8)');
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', '2');
+    c.style.cursor = 'grab';
+    c.style.pointerEvents = 'all';
+    makeSimVertexDraggable(c, idx);
+    c.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      simRoute.splice(idx, 1);
+      renderSimSvg();
+    });
+    svg.appendChild(c);
+  });
+}
+
+function makeSimVertexDraggable(circle, idx) {
+  circle.addEventListener('mousedown', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    var dragging = true;
+    function onMove(ev) {
+      if (!dragging) return;
+      var rect = document.getElementById('sim-map-img').getBoundingClientRect();
+      var px = Math.max(0, Math.min(SIM_IMG_W, (ev.clientX - rect.left) / simScale));
+      var py = Math.max(0, Math.min(SIM_IMG_H, (ev.clientY - rect.top)  / simScale));
+      simRoute[idx] = [pxToLng(px), pyToLat(py)];
+      renderSimSvg();
+    }
+    function onUp() {
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+function toggleSimDraw() {
+  simDrawMode = !simDrawMode;
+  var btn = document.getElementById('sim-draw-btn');
+  btn.textContent = simDrawMode ? 'Done' : 'Draw Path';
+  btn.className   = simDrawMode ? 'btn active-mode' : 'btn sec';
+  document.getElementById('sim-map-wrap').style.cursor = simDrawMode ? 'crosshair' : 'default';
+  setStatus(simDrawMode ? 'Click map to add waypoints' : 'Draw mode off');
+}
+
+function clearSimRoute() {
+  simRoute = [];
+  renderSimSvg();
+  setStatus('Route cleared');
+}
+
+function saveSimRoute() {
+  fetch('/api/sim-route', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({route: simRoute})
+  }).then(function(r) { return r.json(); })
+    .then(function() { setStatus('Sim route saved (' + simRoute.length + ' waypoints)'); })
+    .catch(function() { setStatus('Save failed', true); });
+}
+
+document.getElementById('sim-map-wrap').addEventListener('click', function(e) {
+  if (!simDrawMode) return;
+  var rect = document.getElementById('sim-map-img').getBoundingClientRect();
+  var px = Math.round((e.clientX - rect.left) / simScale);
+  var py = Math.round((e.clientY - rect.top)  / simScale);
+  simRoute.push([pxToLng(px), pyToLat(py)]);
+  renderSimSvg();
+});
+
+document.getElementById('sim-map-img').onload = function() { setSimScale(0.5); };
+
 // ── boot ──────────────────────────────────────────────────────
 Promise.all([
   fetch('/api/places').then(function(r) { return r.json(); }),
   fetch('/api/artists').then(function(r) { return r.json(); }),
-  fetch('/api/acts').then(function(r) { return r.json(); })
+  fetch('/api/acts').then(function(r) { return r.json(); }),
+  fetch('/api/sim-route').then(function(r) { return r.json(); })
 ]).then(function(results) {
-  places  = results[0];
-  artists = results[1];
-  acts    = results[2];
+  places    = results[0];
+  artists   = results[1];
+  acts      = results[2];
+  simRoute  = results[3] || [];
   renderSvg();
   renderPlaceList();
   renderArtistList();
   populateActSelects();
   renderActList();
+  renderSimSvg();
   setStatus('Loaded ' + places.length + ' places, ' + artists.length + ' artists, ' + acts.length + ' acts');
 }).catch(function() { setStatus('Failed to load data', true); });
 
