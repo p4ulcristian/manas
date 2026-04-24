@@ -248,22 +248,40 @@
            " Z"))))
 
 ;; ── API place areas (SVG Catmull-Rom, pixel-positioned) ──────────
+(defn- place-click-handler [p]
+  (fn [e] (.stopPropagation e) (reset! modal-day nil) (reset! modal-place p)))
+
+(defn- place-dot [p]
+  [:div.place-btn
+   {:key      (:id p)
+    :style    {:position "absolute"
+               :left     (:x p)
+               :top      (:y p)
+               :transform "translate(-50%,-50%)"}
+    :on-click (place-click-handler p)}
+   [:span.sparkle.s1] [:span.sparkle.s2] [:span.sparkle.s3]
+   [:span.sparkle.s4] [:span.sparkle.s5] [:span.sparkle.s6]])
+
+(defn- place-svg-area [p d]
+  [:path {:key          (:id p)
+          :d            d
+          :fill         "rgba(201,168,76,0.18)"
+          :stroke       "#c9a84c"
+          :stroke-width 3
+          :style        {:cursor "pointer" :pointer-events "all"}
+          :on-click     (place-click-handler p)}])
+
 (defn place-areas []
-  [:svg {:style {:position "absolute" :left 0 :top 0
-                 :width img-w :height img-h
-                 :overflow "visible" :pointer-events "none"}}
-   (for [p @api-places]
-     (when-let [d (catmull-rom-path (:path p))]
-       [:path {:key          (:id p)
-               :d            d
-               :fill         "rgba(201,168,76,0.18)"
-               :stroke       "#c9a84c"
-               :stroke-width 3
-               :style        {:cursor "pointer" :pointer-events "all"}
-               :on-click     (fn [e]
-                               (.stopPropagation e)
-                               (reset! modal-day nil)
-                               (reset! modal-place p))}]))])
+  (let [with-path (filter #(catmull-rom-path (:path %)) @api-places)
+        with-path-ids (set (map :id with-path))
+        without-path  (remove #(with-path-ids (:id %)) @api-places)]
+    [:<>
+     (for [p without-path] [place-dot p])
+     [:svg {:style {:position "absolute" :left 0 :top 0
+                    :width img-w :height img-h
+                    :overflow "visible" :pointer-events "none"}}
+      (for [p with-path]
+        [place-svg-area p (catmull-rom-path (:path p))])]]))
 
 ;; ── Transform clamping ───────────────────────────────────────────
 (defn- clamp-transform [{:keys [x y scale]}]
