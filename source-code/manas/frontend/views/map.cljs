@@ -262,7 +262,7 @@
      :y (max min-y (min max-y y))}))
 
 ;; ── Map component ─────────────────────────────────────────────────
-(defn map-section []
+(defn map-section [{:keys [dev?]}]
   (let [state      (r/atom {:gps-status :idle :inside? false :sim-done? false})
         transform  (r/atom {:x 0 :y 0 :scale 1})
         user-pos   (r/atom nil)
@@ -368,7 +368,7 @@
         (when @anim-frame (js/cancelAnimationFrame @anim-frame)))
 
       :reagent-render
-      (fn []
+      (fn [{:keys [dev?]}]
         (let [{:keys [gps-status inside? sim-done?]} @state
               {:keys [x y scale]} @transform
               upos @user-pos
@@ -462,15 +462,16 @@
            [place-modal]
            [artist-modal]
 
-           [:div.map-overlay__actions
-            [:button.map-btn {:on-click start-gps}
-             (case gps-status
-               :idle    "\u25ce Locate me"
-               :loading "Searching\u2026"
-               :found   (if inside? "\u2713 You are here" "\u26a0 Outside festival")
-               :error   "GPS unavailable"
-               "\u25ce Locate me")]
-            [:button.map-btn.map-btn--sim {:on-click start-sim}
-             (if sim-done? "\u21ba Again" "\u25b6 Simulate")]
-            (when (and (pos? @sim-idx) (not sim-done?))
-              [:button.map-btn.map-btn--stop {:on-click stop-sim} "\u25fc Stop"])]]))})))
+           (when dev?
+             [:div.map-overlay__actions
+              [:button.map-btn {:on-click start-gps}
+               (case gps-status
+                 :idle    "\u25ce Locate me"
+                 :loading "Searching\u2026"
+                 :found   (if inside? "\u2713 You are here" "\u26a0 Outside festival")
+                 :error   "GPS unavailable"
+                 "\u25ce Locate me")]
+              [:button.map-btn.map-btn--sim {:on-click start-sim}
+               (if sim-done? "\u21ba Again" "\u25b6 Simulate")]
+              (when (and (pos? @sim-idx) (not sim-done?))
+                [:button.map-btn.map-btn--stop {:on-click stop-sim} "\u25fc Stop"])])]))})))

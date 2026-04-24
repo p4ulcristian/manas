@@ -25,6 +25,14 @@
   (io/make-parents places-path)
   (spit places-path (pr-str places)))
 
+(defn- save-artists! [artists]
+  (io/make-parents artists-path)
+  (spit artists-path (pr-str artists)))
+
+(defn- save-acts! [acts]
+  (io/make-parents acts-path)
+  (spit acts-path (pr-str acts)))
+
 (defn- parse-body [request]
   (json/parse-string (slurp (:body request)) true))
 
@@ -110,6 +118,70 @@
 (defn- handle-get-artists [_] (json-response (load-artists)))
 (defn- handle-get-acts    [_] (json-response (load-acts)))
 
+(defn- handle-post-artist [request]
+  (try
+    (let [body   (parse-body request)
+          artist (merge {:id (str (UUID/randomUUID)) :name "" :description ""}
+                        (select-keys body [:id :name :description]))
+          all    (conj (load-artists) artist)]
+      (save-artists! all)
+      (json-response artist :status 201))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
+
+(defn- handle-put-artist [request id]
+  (try
+    (let [body     (parse-body request)
+          artists  (load-artists)
+          updated  (mapv (fn [a]
+                           (if (= (:id a) id)
+                             (merge a (select-keys body [:name :description]))
+                             a))
+                         artists)]
+      (if (some #(= (:id %) id) artists)
+        (do (save-artists! updated)
+            (json-response (first (filter #(= (:id %) id) updated))))
+        (json-response {:error "Not found"} :status 404)))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
+
+(defn- handle-delete-artist [id]
+  (let [updated (vec (remove #(= (:id %) id) (load-artists)))]
+    (save-artists! updated)
+    (json-response {:ok true})))
+
+(defn- handle-post-act [request]
+  (try
+    (let [body (parse-body request)
+          act  (merge {:id (str (UUID/randomUUID)) :artist-id "" :place-id "" :date "" :time ""}
+                      (select-keys body [:artist-id :place-id :date :time]))
+          all  (conj (load-acts) act)]
+      (save-acts! all)
+      (json-response act :status 201))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
+
+(defn- handle-put-act [request id]
+  (try
+    (let [body    (parse-body request)
+          acts    (load-acts)
+          updated (mapv (fn [a]
+                          (if (= (:id a) id)
+                            (merge a (select-keys body [:artist-id :place-id :date :time]))
+                            a))
+                        acts)]
+      (if (some #(= (:id %) id) acts)
+        (do (save-acts! updated)
+            (json-response (first (filter #(= (:id %) id) updated))))
+        (json-response {:error "Not found"} :status 404)))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
+
+(defn- handle-delete-act [id]
+  (let [updated (vec (remove #(= (:id %) id) (load-acts)))]
+    (save-acts! updated)
+    (json-response {:ok true})))
+
 (defn- handle-post-place [request]
   (try
     (let [body  (parse-body request)
@@ -169,7 +241,7 @@
   (let [uri    (:uri request)
         method (:request-method request)]
     (cond
-      (= uri "/")
+      (or (= uri "/") (= uri "/dev"))
       {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"} :body (html-shell)}
 
       (and (= uri "/upload") (= method :get))
@@ -202,8 +274,26 @@
       (and (= uri "/api/artists") (= method :get))
       (handle-get-artists request)
 
+      (and (= uri "/api/artists") (= method :post))
+      (handle-post-artist request)
+
+      (and (clojure.string/starts-with? uri "/api/artists/") (= method :put))
+      (handle-put-artist request (subs uri (count "/api/artists/")))
+
+      (and (clojure.string/starts-with? uri "/api/artists/") (= method :delete))
+      (handle-delete-artist (subs uri (count "/api/artists/")))
+
       (and (= uri "/api/acts") (= method :get))
       (handle-get-acts request)
+
+      (and (= uri "/api/acts") (= method :post))
+      (handle-post-act request)
+
+      (and (clojure.string/starts-with? uri "/api/acts/") (= method :put))
+      (handle-put-act request (subs uri (count "/api/acts/")))
+
+      (and (clojure.string/starts-with? uri "/api/acts/") (= method :delete))
+      (handle-delete-act (subs uri (count "/api/acts/")))
 
       (clojure.string/starts-with? uri "/images/")
       (serve-file uri)

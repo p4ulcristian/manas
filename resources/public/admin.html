@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Place Editor</title>
+<title>Admin — Manas</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
@@ -11,6 +11,12 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
 #toolbar h1 { font-size:1rem; color:#c9a84c; }
 .hint { font-size:.8rem; color:#888; }
 #status { font-size:.78rem; color:#6ab04c; min-height:18px; }
+#tabs { display:flex; gap:0; border-bottom:1px solid #333; background:#111; }
+.tab-btn { padding:10px 20px; background:none; border:none; color:#888; cursor:pointer; font-size:.9rem; border-bottom:2px solid transparent; }
+.tab-btn.active { color:#c9a84c; border-bottom-color:#c9a84c; }
+.tab-panel { display:none; flex:1; overflow:hidden; }
+.tab-panel.active { display:flex; }
+/* Places tab */
 #main { display:flex; flex:1; overflow:hidden; }
 #map-area { flex:1; overflow:auto; padding:16px; }
 #map-wrap { position:relative; display:inline-block; cursor:crosshair; }
@@ -18,46 +24,68 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
 .place-dot { position:absolute; width:24px; height:24px; border-radius:50%; background:rgba(201,168,76,0.85); border:2px solid #fff; transform:translate(-50%,-50%); cursor:grab; display:flex; align-items:center; justify-content:center; font-size:9px; color:#111; font-weight:700; text-align:center; user-select:none; }
 .place-dot:active { cursor:grabbing; }
 .place-dot.selected { background:rgba(255,100,100,0.9); border-color:#ff4444; }
-#sidebar { width:260px; background:#111; border-left:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
-#sidebar h2 { font-size:.9rem; color:#c9a84c; margin-bottom:4px; }
-#sidebar label { font-size:.78rem; color:#aaa; display:block; margin-bottom:3px; }
-#sidebar input, #sidebar select { width:100%; background:#222; border:1px solid #444; color:#eee; padding:7px 10px; border-radius:6px; font-size:.85rem; }
-#sidebar hr { border-color:#333; }
+/* Sidebar shared */
+.sidebar { width:280px; background:#111; border-left:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+.sidebar h2 { font-size:.9rem; color:#c9a84c; margin-bottom:4px; }
+.sidebar label { font-size:.78rem; color:#aaa; display:block; margin-bottom:3px; }
+.sidebar input, .sidebar select, .sidebar textarea { width:100%; background:#222; border:1px solid #444; color:#eee; padding:7px 10px; border-radius:6px; font-size:.85rem; }
+.sidebar textarea { resize:vertical; min-height:60px; }
+.sidebar hr { border-color:#333; }
 .btn { background:#c9a84c; color:#111; border:none; padding:7px 14px; border-radius:6px; cursor:pointer; font-size:.85rem; font-weight:600; }
 .btn:hover { background:#e0be6a; }
 .btn.del { background:#e55; color:#fff; }
 .btn.del:hover { background:#ff6666; }
+.btn.sec { background:#333; color:#eee; border:1px solid #555; }
+.btn.sec:hover { background:#444; }
 .btn-row { display:flex; gap:8px; }
-#place-list { display:flex; flex-direction:column; gap:6px; }
-.place-item { background:#1e1e1e; border:1px solid #333; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:.82rem; }
-.place-item:hover { border-color:#c9a84c; }
-.place-item.selected { border-color:#ff4444; }
-.place-item .pname { font-weight:600; }
-.place-item .pcoords { color:#666; font-size:.75rem; }
+/* List items */
+.item-list { display:flex; flex-direction:column; gap:6px; }
+.list-item { background:#1e1e1e; border:1px solid #333; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:.82rem; }
+.list-item:hover { border-color:#c9a84c; }
+.list-item.selected { border-color:#ff4444; }
+.list-item .iname { font-weight:600; }
+.list-item .isub { color:#666; font-size:.75rem; margin-top:2px; }
+/* Artists/Acts full panel */
+.full-panel { display:flex; flex:1; overflow:hidden; }
+.list-col { width:300px; background:#111; border-right:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+.list-col h2 { font-size:.9rem; color:#c9a84c; }
+.edit-col { flex:1; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+.edit-col h2 { font-size:.9rem; color:#c9a84c; }
+.field { display:flex; flex-direction:column; gap:4px; }
+.field label { font-size:.78rem; color:#aaa; }
+.field input, .field select, .field textarea { background:#222; border:1px solid #444; color:#eee; padding:7px 10px; border-radius:6px; font-size:.85rem; }
+.field textarea { resize:vertical; min-height:70px; }
 #zoom-ctrl { display:flex; gap:6px; align-items:center; }
 #zoom-ctrl button { background:#222; color:#eee; border:1px solid #444; width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:1rem; }
 </style>
 </head>
 <body>
 <div id="toolbar">
-  <h1>Place Editor</h1>
-  <span class="hint">Click map to add &middot; Drag dot to reposition &middot; Select to edit/delete</span>
-  <div id="zoom-ctrl">
+  <h1>Manas Admin</h1>
+  <div id="zoom-ctrl" style="display:none">
     <button onclick="zoom(-0.25)">&#8722;</button>
     <span id="zoom-label" style="font-size:.8rem;color:#888">100%</span>
     <button onclick="zoom(0.25)">+</button>
   </div>
+  <span class="hint" id="toolbar-hint"></span>
   <div id="status"></div>
 </div>
-<div id="main">
+<div id="tabs">
+  <button class="tab-btn active" onclick="switchTab('places')">Places</button>
+  <button class="tab-btn" onclick="switchTab('artists')">Artists</button>
+  <button class="tab-btn" onclick="switchTab('acts')">Acts</button>
+</div>
+
+<!-- PLACES TAB -->
+<div id="tab-places" class="tab-panel active">
   <div id="map-area">
     <div id="map-wrap">
       <img id="map-img" src="/images/festival-map.png" draggable="false">
     </div>
   </div>
-  <div id="sidebar">
+  <div class="sidebar">
     <h2>Places</h2>
-    <div id="place-list"></div>
+    <div id="place-list" class="item-list"></div>
     <hr>
     <h2>Edit selected</h2>
     <div><label>Name</label><input id="f-name" type="text" placeholder="e.g. Portal"></div>
@@ -66,48 +94,112 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
         <option value="stage">Stage</option>
         <option value="bar">Bar</option>
         <option value="food">Food</option>
-        <option value="portal">Portal</option>
         <option value="camping">Camping</option>
         <option value="info">Info</option>
         <option value="other">Other</option>
       </select>
     </div>
-    <div><label>Icon (emoji/symbol)</label><input id="f-icon" type="text" placeholder="♪ ◈ △ i" maxlength="4"></div>
+    <div><label>Icon</label><input id="f-icon" type="text" placeholder="♪ ◈ △ i" maxlength="4"></div>
+    <div><label>Description</label><textarea id="f-desc" placeholder="Short description"></textarea></div>
     <div class="btn-row">
-      <button class="btn" onclick="saveSelected()">Save</button>
-      <button class="btn del" onclick="deleteSelected()">Delete</button>
+      <button class="btn" onclick="savePlace()">Save</button>
+      <button class="btn del" onclick="deletePlace()">Delete</button>
     </div>
   </div>
 </div>
-<script>
-var IMG_W = 1440, IMG_H = 1920;
-var places = [];
-var selected = null;
-var scale = 0.5;
 
+<!-- ARTISTS TAB -->
+<div id="tab-artists" class="tab-panel">
+  <div class="full-panel">
+    <div class="list-col">
+      <h2>Artists</h2>
+      <button class="btn" onclick="newArtist()">+ Add Artist</button>
+      <div id="artist-list" class="item-list"></div>
+    </div>
+    <div class="edit-col">
+      <h2 id="artist-edit-title">Select an artist</h2>
+      <div class="field"><label>ID (slug)</label><input id="a-id" type="text" placeholder="e.g. liquid-soul"></div>
+      <div class="field"><label>Name</label><input id="a-name" type="text" placeholder="Display name"></div>
+      <div class="field"><label>Description</label><textarea id="a-desc" placeholder="Short bio"></textarea></div>
+      <div class="btn-row">
+        <button class="btn" onclick="saveArtist()">Save</button>
+        <button class="btn del" onclick="deleteArtist()">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTS TAB -->
+<div id="tab-acts" class="tab-panel">
+  <div class="full-panel">
+    <div class="list-col">
+      <h2>Acts</h2>
+      <button class="btn" onclick="newAct()">+ Add Act</button>
+      <div id="act-list" class="item-list"></div>
+    </div>
+    <div class="edit-col">
+      <h2 id="act-edit-title">Select an act</h2>
+      <div class="field"><label>Artist</label>
+        <select id="act-artist"></select>
+      </div>
+      <div class="field"><label>Stage / Place</label>
+        <select id="act-place"></select>
+      </div>
+      <div class="field"><label>Date</label><input id="act-date" type="date"></div>
+      <div class="field"><label>Time</label><input id="act-time" type="time"></div>
+      <div class="btn-row">
+        <button class="btn" onclick="saveAct()">Save</button>
+        <button class="btn del" onclick="deleteAct()">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── shared state ──────────────────────────────────────────────
+var places = [], artists = [], acts = [];
+var selectedPlace = null, selectedArtist = null, selectedAct = null;
+var scale = 0.5;
+var IMG_W = 1440, IMG_H = 1920;
+
+function setStatus(msg, err) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.color = err ? '#e55' : '#6ab04c';
+}
+
+// ── tabs ──────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    if (b.textContent.toLowerCase() === name) b.classList.add('active');
+  });
+  document.getElementById('zoom-ctrl').style.display = name === 'places' ? 'flex' : 'none';
+  var hints = { places: 'Click map to add · Drag dot to reposition · Select to edit/delete',
+                artists: 'Click an artist to edit, or add a new one',
+                acts: 'Click an act to edit, or add a new one' };
+  document.getElementById('toolbar-hint').textContent = hints[name] || '';
+}
+
+// ── PLACES ────────────────────────────────────────────────────
 function setScale(s) {
   scale = Math.max(0.1, Math.min(3, s));
   var img = document.getElementById('map-img');
   img.style.width  = (IMG_W * scale) + 'px';
   img.style.height = (IMG_H * scale) + 'px';
   document.getElementById('zoom-label').textContent = Math.round(scale * 100) + '%';
-  render();
+  renderPlaces();
 }
-
 function zoom(delta) { setScale(scale + delta); }
 
-function status(msg, err) {
-  var el = document.getElementById('status');
-  el.textContent = msg;
-  el.style.color = err ? '#e55' : '#6ab04c';
-}
-
-function render() {
+function renderPlaces() {
   document.querySelectorAll('.place-dot').forEach(function(d) { d.remove(); });
   var wrap = document.getElementById('map-wrap');
   places.forEach(function(p) {
     var dot = document.createElement('div');
-    dot.className = 'place-dot' + (selected === p.id ? ' selected' : '');
+    dot.className = 'place-dot' + (selectedPlace === p.id ? ' selected' : '');
     dot.style.left = (p.x * scale) + 'px';
     dot.style.top  = (p.y * scale) + 'px';
     dot.title = p.name;
@@ -117,31 +209,32 @@ function render() {
     dot.addEventListener('click', function(e) { e.stopPropagation(); selectPlace(p.id); });
     wrap.appendChild(dot);
   });
-  renderList();
+  renderPlaceList();
 }
 
-function renderList() {
+function renderPlaceList() {
   var list = document.getElementById('place-list');
   list.innerHTML = '';
   places.forEach(function(p) {
     var item = document.createElement('div');
-    item.className = 'place-item' + (selected === p.id ? ' selected' : '');
-    item.innerHTML = '<div class="pname">' + (p.icon ? p.icon + ' ' : '') + (p.name || 'unnamed') + '</div>' +
-      '<div class="pcoords">x:' + Math.round(p.x) + ' y:' + Math.round(p.y) + ' &middot; ' + (p.type || '') + '</div>';
+    item.className = 'list-item' + (selectedPlace === p.id ? ' selected' : '');
+    item.innerHTML = '<div class="iname">' + (p.icon ? p.icon + ' ' : '') + (p.name || 'unnamed') + '</div>' +
+      '<div class="isub">x:' + Math.round(p.x) + ' y:' + Math.round(p.y) + ' · ' + (p.type || '') + '</div>';
     item.onclick = function() { selectPlace(p.id); };
     list.appendChild(item);
   });
 }
 
 function selectPlace(id) {
-  selected = id;
+  selectedPlace = id;
   var p = places.find(function(x) { return x.id === id; });
   if (p) {
     document.getElementById('f-name').value = p.name || '';
     document.getElementById('f-type').value = p.type || 'other';
     document.getElementById('f-icon').value = p.icon || '';
+    document.getElementById('f-desc').value = p.description || '';
   }
-  render();
+  renderPlaces();
 }
 
 function makeDraggable(dot, p) {
@@ -164,8 +257,8 @@ function makeDraggable(dot, p) {
       fetch('/api/places/' + p.id, {
         method: 'PUT', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({x: p.x, y: p.y})
-      }).then(function() { status('Moved ' + (p.name || p.id)); renderList(); })
-        .catch(function() { status('Move failed', true); });
+      }).then(function() { setStatus('Moved ' + (p.name || p.id)); renderPlaceList(); })
+        .catch(function() { setStatus('Move failed', true); });
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -182,36 +275,232 @@ document.getElementById('map-wrap').addEventListener('click', function(e) {
     body: JSON.stringify({name: 'New Place', type: 'other', icon: '◉', x: x, y: y})
   })
   .then(function(r) { return r.json(); })
-  .then(function(p) { places.push(p); selectPlace(p.id); status('Added at ' + x + ',' + y); })
-  .catch(function() { status('Add failed', true); });
+  .then(function(p) { places.push(p); selectPlace(p.id); setStatus('Added at ' + x + ',' + y); })
+  .catch(function() { setStatus('Add failed', true); });
 });
 
-function saveSelected() {
-  var p = places.find(function(x) { return x.id === selected; });
+function savePlace() {
+  var p = places.find(function(x) { return x.id === selectedPlace; });
   if (!p) return;
   p.name = document.getElementById('f-name').value;
   p.type = document.getElementById('f-type').value;
   p.icon = document.getElementById('f-icon').value;
+  p.description = document.getElementById('f-desc').value;
   fetch('/api/places/' + p.id, {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name: p.name, type: p.type, icon: p.icon})
-  }).then(function() { render(); status('Saved ' + p.name); })
-    .catch(function() { status('Save failed', true); });
+    body: JSON.stringify({name: p.name, type: p.type, icon: p.icon, description: p.description})
+  }).then(function() { renderPlaces(); setStatus('Saved ' + p.name); })
+    .catch(function() { setStatus('Save failed', true); });
 }
 
-function deleteSelected() {
-  if (!selected) return;
-  fetch('/api/places/' + selected, {method: 'DELETE'})
+function deletePlace() {
+  if (!selectedPlace) return;
+  fetch('/api/places/' + selectedPlace, {method: 'DELETE'})
   .then(function() {
-    places = places.filter(function(p) { return p.id !== selected; });
-    selected = null; render(); status('Deleted');
-  }).catch(function() { status('Delete failed', true); });
+    places = places.filter(function(p) { return p.id !== selectedPlace; });
+    selectedPlace = null; renderPlaces(); setStatus('Deleted');
+  }).catch(function() { setStatus('Delete failed', true); });
 }
 
 document.getElementById('map-img').onload = function() { setScale(0.5); };
-fetch('/api/places').then(function(r) { return r.json(); })
-  .then(function(data) { places = data; render(); status('Loaded ' + data.length + ' places'); })
-  .catch(function() { status('Failed to load places', true); });
+
+// ── ARTISTS ───────────────────────────────────────────────────
+function renderArtistList() {
+  var list = document.getElementById('artist-list');
+  list.innerHTML = '';
+  artists.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  artists.forEach(function(a) {
+    var item = document.createElement('div');
+    item.className = 'list-item' + (selectedArtist === a.id ? ' selected' : '');
+    item.innerHTML = '<div class="iname">' + (a.name || a.id) + '</div>' +
+      '<div class="isub">' + (a.id || '') + '</div>';
+    item.onclick = function() { selectArtist(a.id); };
+    list.appendChild(item);
+  });
+}
+
+function selectArtist(id) {
+  selectedArtist = id;
+  var a = artists.find(function(x) { return x.id === id; });
+  if (a) {
+    document.getElementById('artist-edit-title').textContent = 'Edit: ' + (a.name || a.id);
+    document.getElementById('a-id').value   = a.id || '';
+    document.getElementById('a-name').value = a.name || '';
+    document.getElementById('a-desc').value = a.description || '';
+  }
+  renderArtistList();
+}
+
+function newArtist() {
+  selectedArtist = null;
+  document.getElementById('artist-edit-title').textContent = 'New Artist';
+  document.getElementById('a-id').value   = '';
+  document.getElementById('a-name').value = '';
+  document.getElementById('a-desc').value = '';
+  renderArtistList();
+}
+
+function saveArtist() {
+  var id   = document.getElementById('a-id').value.trim();
+  var name = document.getElementById('a-name').value.trim();
+  var desc = document.getElementById('a-desc').value.trim();
+  if (!id) { setStatus('ID required', true); return; }
+  if (selectedArtist) {
+    fetch('/api/artists/' + selectedArtist, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: name, description: desc})
+    }).then(function(r) { return r.json(); })
+      .then(function(updated) {
+        var idx = artists.findIndex(function(a) { return a.id === selectedArtist; });
+        if (idx >= 0) artists[idx] = updated;
+        renderArtistList();
+        setStatus('Saved ' + name);
+      }).catch(function() { setStatus('Save failed', true); });
+  } else {
+    fetch('/api/artists', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({id: id, name: name, description: desc})
+    }).then(function(r) { return r.json(); })
+      .then(function(a) { artists.push(a); selectedArtist = a.id; renderArtistList(); setStatus('Added ' + name); })
+      .catch(function() { setStatus('Add failed', true); });
+  }
+}
+
+function deleteArtist() {
+  if (!selectedArtist) return;
+  fetch('/api/artists/' + selectedArtist, {method: 'DELETE'})
+  .then(function() {
+    artists = artists.filter(function(a) { return a.id !== selectedArtist; });
+    selectedArtist = null;
+    newArtist();
+    renderArtistList();
+    setStatus('Deleted');
+  }).catch(function() { setStatus('Delete failed', true); });
+}
+
+// ── ACTS ──────────────────────────────────────────────────────
+function populateActSelects() {
+  var asel = document.getElementById('act-artist');
+  var psel = document.getElementById('act-place');
+  asel.innerHTML = '';
+  psel.innerHTML = '';
+  artists.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+  artists.forEach(function(a) {
+    var opt = document.createElement('option');
+    opt.value = a.id; opt.textContent = a.name || a.id;
+    asel.appendChild(opt);
+  });
+  places.forEach(function(p) {
+    var opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = (p.icon ? p.icon + ' ' : '') + (p.name || p.id);
+    psel.appendChild(opt);
+  });
+}
+
+function artistName(id) {
+  var a = artists.find(function(x) { return x.id === id; });
+  return a ? (a.name || a.id) : id;
+}
+function placeName(id) {
+  var p = places.find(function(x) { return x.id === id; });
+  return p ? (p.name || p.id) : id;
+}
+
+function renderActList() {
+  var list = document.getElementById('act-list');
+  list.innerHTML = '';
+  var sorted = acts.slice().sort(function(a, b) {
+    var da = (a.date || '') + (a.time || '');
+    var db = (b.date || '') + (b.time || '');
+    return da.localeCompare(db);
+  });
+  sorted.forEach(function(a) {
+    var item = document.createElement('div');
+    item.className = 'list-item' + (selectedAct === a.id ? ' selected' : '');
+    item.innerHTML = '<div class="iname">' + artistName(a['artist-id']) + '</div>' +
+      '<div class="isub">' + placeName(a['place-id']) + ' · ' + (a.date || '') + ' ' + (a.time || '') + '</div>';
+    item.onclick = function() { selectAct(a.id); };
+    list.appendChild(item);
+  });
+}
+
+function selectAct(id) {
+  selectedAct = id;
+  var a = acts.find(function(x) { return x.id === id; });
+  if (a) {
+    document.getElementById('act-edit-title').textContent = 'Edit: ' + artistName(a['artist-id']);
+    document.getElementById('act-artist').value = a['artist-id'] || '';
+    document.getElementById('act-place').value  = a['place-id']  || '';
+    document.getElementById('act-date').value   = a.date  || '';
+    document.getElementById('act-time').value   = a.time  || '';
+  }
+  renderActList();
+}
+
+function newAct() {
+  selectedAct = null;
+  document.getElementById('act-edit-title').textContent = 'New Act';
+  document.getElementById('act-date').value = '';
+  document.getElementById('act-time').value = '';
+  renderActList();
+}
+
+function saveAct() {
+  var artistId = document.getElementById('act-artist').value;
+  var placeId  = document.getElementById('act-place').value;
+  var date     = document.getElementById('act-date').value;
+  var time     = document.getElementById('act-time').value;
+  var payload  = {'artist-id': artistId, 'place-id': placeId, date: date, time: time};
+  if (selectedAct) {
+    fetch('/api/acts/' + selectedAct, {
+      method: 'PUT', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+      .then(function(updated) {
+        var idx = acts.findIndex(function(a) { return a.id === selectedAct; });
+        if (idx >= 0) acts[idx] = updated;
+        renderActList();
+        setStatus('Saved act');
+      }).catch(function() { setStatus('Save failed', true); });
+  } else {
+    fetch('/api/acts', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); })
+      .then(function(a) { acts.push(a); selectedAct = a.id; renderActList(); setStatus('Added act'); })
+      .catch(function() { setStatus('Add failed', true); });
+  }
+}
+
+function deleteAct() {
+  if (!selectedAct) return;
+  fetch('/api/acts/' + selectedAct, {method: 'DELETE'})
+  .then(function() {
+    acts = acts.filter(function(a) { return a.id !== selectedAct; });
+    selectedAct = null;
+    newAct();
+    renderActList();
+    setStatus('Deleted');
+  }).catch(function() { setStatus('Delete failed', true); });
+}
+
+// ── boot ──────────────────────────────────────────────────────
+Promise.all([
+  fetch('/api/places').then(function(r) { return r.json(); }),
+  fetch('/api/artists').then(function(r) { return r.json(); }),
+  fetch('/api/acts').then(function(r) { return r.json(); })
+]).then(function(results) {
+  places  = results[0];
+  artists = results[1];
+  acts    = results[2];
+  renderPlaces();
+  renderArtistList();
+  populateActSelects();
+  renderActList();
+  setStatus('Loaded ' + places.length + ' places, ' + artists.length + ' artists, ' + acts.length + ' acts');
+}).catch(function() { setStatus('Failed to load data', true); });
+
+switchTab('places');
 </script>
 </body>
 </html>

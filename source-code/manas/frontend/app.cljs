@@ -4,9 +4,12 @@
 
 (defonce root (atom nil))
 
+(defn dev-mode? []
+  (= (.-pathname js/window.location) "/dev"))
+
 (defn render-app! []
   (when @root
-    (rdom/render @root [festival-map/map-section])))
+    (rdom/render @root [festival-map/map-section {:dev? (dev-mode?)}])))
 
 (defn start-app! []
   (reset! root (rdom/create-root (.getElementById js/document "app")))
