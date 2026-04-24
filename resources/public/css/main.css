@@ -781,9 +781,6 @@ img { display: block; max-width: 100%; }
 .place-modal__days {
   display: flex; gap: 6px; padding: 12px 0 8px; margin: 0;
   position: sticky; top: 0; z-index: 10;
-  background: rgba(40,28,16,0.97);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .place-modal__day-tab {
   flex: 1;
