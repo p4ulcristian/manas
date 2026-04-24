@@ -283,8 +283,18 @@
     [:radialGradient {:id            (str "grad-" (:id p))
                       :gradientUnits "userSpaceOnUse"
                       :cx cx :cy cy :r (* r 1.4)}
-     [:stop {:class "place-grad-inner" :offset "0%" :stop-color "#c9a84c" :stop-opacity "0.38"}]
-     [:stop {:offset "100%" :stop-color "#c9a84c" :stop-opacity "0"}]]))
+     [:stop {:offset "0%" :stop-color "#c9a84c" :stop-opacity "0.38"}
+     [:animate {:attributeName "stop-color"
+                :values "#c9a84c;#52b788;#c9a84c"
+                :dur "10s" :calcMode "spline"
+                :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
+                :repeatCount "indefinite"}]]
+     [:stop {:offset "100%" :stop-color "#c9a84c" :stop-opacity "0"}
+      [:animate {:attributeName "stop-color"
+                 :values "#c9a84c;#52b788;#c9a84c"
+                 :dur "10s" :calcMode "spline"
+                 :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
+                 :repeatCount "indefinite"}]]]))
 
 (defn- place-svg-area [p d]
   [:path {:key          (:id p)
@@ -294,7 +304,12 @@
           :stroke       "#c9a84c"
           :stroke-width 3
           :filter       "url(#amorph)"
-          :on-click     (place-click-handler p)}])
+          :on-click     (place-click-handler p)}
+   [:animate {:attributeName "stroke"
+              :values        "#c9a84c;#52b788;#c9a84c"
+              :dur           "10s" :calcMode "spline"
+              :keySplines    "0.45 0 0.55 1;0.45 0 0.55 1"
+              :repeatCount   "indefinite"}]])
 
 (defn place-areas []
   (let [with-path (filter #(catmull-rom-path (:path %)) @api-places)
