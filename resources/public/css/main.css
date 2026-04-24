@@ -722,7 +722,10 @@ img { display: block; max-width: 100%; }
   pointer-events: all;
   transition: stroke-width 0.2s;
 }
-.place-area:hover { stroke-width: 5; }
+.place-area:hover {
+  stroke-width: 5;
+  filter: url(#amorph) brightness(1.8);
+}
 
 /* ── Place modal sheet ── */
 .place-modal {
