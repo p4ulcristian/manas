@@ -178,10 +178,8 @@
                         sort)
           active   (or @modal-day (first dates))]
       [:div.place-modal
-       {:class    (when @modal-closing "closing")
-        :on-click close-modal!}
+       {:class (when @modal-closing "closing")}
        [:div.place-modal__sheet
-        {:on-click #(.stopPropagation %)}
         [:button.place-modal__close {:on-click close-modal!} "\u2715"]
         [:div.place-modal__header
          [:span.place-modal__icon (or (:icon p) "O")]
