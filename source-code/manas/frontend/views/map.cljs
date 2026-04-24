@@ -263,17 +263,37 @@
    [:span.sparkle.s4] [:span.sparkle.s5] [:span.sparkle.s6]])
 
 (defn- amorph-filter []
-  [:defs
-   [:filter {:id "amorph" :x "-25%" :y "-25%" :width "150%" :height "150%"}
-    [:feTurbulence {:type "fractalNoise" :baseFrequency "0.009" :numOctaves "3" :result "noise"}]
-    [:feDisplacementMap {:in "SourceGraphic" :in2 "noise"
-                         :scale "18" :xChannelSelector "R" :yChannelSelector "G"}]]])
+  [:filter {:id "amorph" :x "-40%" :y "-40%" :width "180%" :height "180%"}
+   [:feTurbulence {:type "fractalNoise" :baseFrequency "0.009" :numOctaves "3" :result "noise"}]
+   [:feDisplacementMap {:in "SourceGraphic" :in2 "noise" :scale "18"
+                        :xChannelSelector "R" :yChannelSelector "G" :result "warped"}]
+   [:feGaussianBlur {:in "warped" :stdDeviation "22" :result "glow"}]
+   [:feMerge
+    [:feMergeNode {:in "glow"}]
+    [:feMergeNode {:in "warped"}]]])
+
+(defn- centroid [pts]
+  [(/ (apply + (map first pts)) (count pts))
+   (/ (apply + (map second pts)) (count pts))])
+
+(defn- place-radial-gradient [p]
+  (let [pts    (:path p)
+        [cx cy] (centroid pts)
+        r      (apply max (map (fn [[x y]]
+                                 (js/Math.sqrt (+ (* (- x cx) (- x cx))
+                                                  (* (- y cy) (- y cy)))))
+                               pts))]
+    [:radialGradient {:id            (str "grad-" (:id p))
+                      :gradientUnits "userSpaceOnUse"
+                      :cx cx :cy cy :r (* r 1.4)}
+     [:stop {:offset "0%"   :stop-color "#c9a84c" :stop-opacity "0.38"}]
+     [:stop {:offset "100%" :stop-color "#c9a84c" :stop-opacity "0"}]]))
 
 (defn- place-svg-area [p d]
   [:path {:key          (:id p)
           :class        "place-area"
           :d            d
-          :fill         "rgba(201,168,76,1)"
+          :fill         (str "url(#grad-" (:id p) ")")
           :stroke       "#c9a84c"
           :stroke-width 3
           :filter       "url(#amorph)"
@@ -288,7 +308,8 @@
      [:svg {:style {:position "absolute" :left 0 :top 0
                     :width img-w :height img-h
                     :overflow "visible" :pointer-events "none"}}
-      [amorph-filter]
+      (into [:defs [amorph-filter]]
+            (map place-radial-gradient with-path))
       (for [p with-path]
         [place-svg-area p (catmull-rom-path (:path p))])]]))
 
