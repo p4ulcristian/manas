@@ -24,7 +24,11 @@ L 24:ub
 L 25:Ed
 L 26:dg
 L 27:eg
+L 28:jg
+L 29:ig
 L 3:d
+L 30:Sh
+L 31:Uh
 L 4:e
 L 5:f
 L 6:h
@@ -449,40 +453,41 @@ cljs$cst$173$span_DOT_sparkle_DOT_s4:ei
 cljs$cst$174$span_DOT_sparkle_DOT_s5:fi
 cljs$cst$175$span_DOT_sparkle_DOT_s6:gi
 cljs$cst$176$scale:Xi
-cljs$cst$177$gps_status:jg
-cljs$cst$178$idle:Ug
-cljs$cst$179$inside_QMARK_:Nh
-cljs$cst$180$sim_done_QMARK_:Di
-cljs$cst$181$dragging:ig
-cljs$cst$182$pinching:Ji
-cljs$cst$183$last_x:Kg
-cljs$cst$184$last_y:Ng
-cljs$cst$185$pinch_dist:Ci
-cljs$cst$186$pinch_cx:Wh
-cljs$cst$187$pinch_cy:Xh
-cljs$cst$188$component_did_mount:yh
-cljs$cst$189$loading:Ik
-cljs$cst$190$found:bh
-cljs$cst$191$section_SHARP_garden_DOT_map_section:Sh
-cljs$cst$192$div_DOT_map_viewport:pi
-cljs$cst$193$on_touch_start:xh
-cljs$cst$194$on_touch_end:Ph
-cljs$cst$195$div_DOT_map_world:oh
-cljs$cst$196$transform_origin:Qh
-cljs$cst$197$width:gh
-cljs$cst$198$height:wi
-cljs$cst$199$img:jh
+cljs$cst$177$dev_QMARK_:Gi
+cljs$cst$178$gps_status:Ng
+cljs$cst$179$idle:ch
+cljs$cst$180$inside_QMARK_:Qh
+cljs$cst$181$sim_done_QMARK_:al
+cljs$cst$182$dragging:Kg
+cljs$cst$183$pinching:ml
+cljs$cst$184$last_x:Sg
+cljs$cst$185$last_y:Ug
+cljs$cst$186$pinch_dist:Ik
+cljs$cst$187$pinch_cx:ui
+cljs$cst$188$pinch_cy:wi
+cljs$cst$189$component_did_mount:Ph
+cljs$cst$190$loading:nl
+cljs$cst$191$found:gh
+cljs$cst$192$section_SHARP_garden_DOT_map_section:Xh
+cljs$cst$193$div_DOT_map_viewport:Di
+cljs$cst$194$on_touch_start:Nh
+cljs$cst$195$on_touch_end:Rh
+cljs$cst$196$div_DOT_map_world:yh
+cljs$cst$197$transform_origin:Vh
+cljs$cst$198$width:oh
+cljs$cst$199$height:Ji
 cljs$cst$2$meta:rg
 cljs$cst$20$keyword_fn:Jg
-cljs$cst$200$src:ch
-cljs$cst$201$draggable:Gi
-cljs$cst$202$display:Rh
-cljs$cst$203$user_select:Vh
-cljs$cst$204$div_DOT_map_user_dot:Sg
-cljs$cst$205$div_DOT_map_overlay__actions:Uh
-cljs$cst$206$button_DOT_map_btn:ui
-cljs$cst$207$button_DOT_map_btn_DOT_map_btn__sim:Yh
-cljs$cst$208$button_DOT_map_btn_DOT_map_btn__stop:Ii
+cljs$cst$200$img:xh
+cljs$cst$201$src:jh
+cljs$cst$202$draggable:kl
+cljs$cst$203$display:Wh
+cljs$cst$204$user_select:pi
+cljs$cst$205$div_DOT_map_user_dot:bh
+cljs$cst$206$div_DOT_map_overlay__actions:Yh
+cljs$cst$207$button_DOT_map_btn:Ii
+cljs$cst$208$button_DOT_map_btn_DOT_map_btn__sim:Ci
+cljs$cst$209$button_DOT_map_btn_DOT_map_btn__stop:ll
 cljs$cst$21$keywordize_keys:qn
 cljs$cst$4$print_length:lg
 cljs$cst$5$validator:bi
@@ -510,6 +515,7 @@ clojure$string$replace_all:Ti
 clojure$string$replace_with:Ui
 clojure$string$split$cljs$0core$0IFn$0_invoke$0arity$03:Hl
 container$jscomp$inline_1141:jl
+el$jscomp$inline_1175:pl
 fn_to_element$jscomp$inline_843:Zk
 goog$UID_PROPERTY_:da
 goog$getUid:ca
@@ -647,7 +653,7 @@ reagent$ratom$rea_queue:Fj
 reagent$ratom$remove_w:Cj
 reagent$ratom$run_in_reaction:Nj
 reagent$ratom$temp_reaction:Mj
-root$jscomp$inline_1176:al
+root$jscomp$inline_1174:ol
 shadow$js$files:Mi
 shadow$js$jsRequire:Pi
 shadow$js$nativeProvides:Ni

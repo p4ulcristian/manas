@@ -31,28 +31,7 @@
    [20.137602944070693 46.26225368796318]])
 
 ;; ── Simulation route [lng lat] ────────────────────────────────────
-(def sim-route
-  [[20.13850 46.26220]
-   [20.13870 46.26215]
-   [20.13900 46.26210]
-   [20.13910 46.26205]
-   [20.13920 46.26200]
-   [20.13940 46.26210]
-   [20.13955 46.26225]
-   [20.13960 46.26240]
-   [20.13980 46.26230]
-   [20.14010 46.26210]
-   [20.14000 46.26175]
-   [20.14000 46.26150]
-   [20.13980 46.26135]
-   [20.13950 46.26125]
-   [20.13900 46.26120]
-   [20.13850 46.26125]
-   [20.13820 46.26135]
-   [20.13810 46.26155]
-   [20.13820 46.26180]
-   [20.13830 46.26205]
-   [20.13850 46.26220]])
+(defonce sim-route (r/atom []))
 
 ;; ── Point-in-polygon ──────────────────────────────────────────────
 (defn- inside-festival? [lng lat]
@@ -73,6 +52,7 @@
 (defonce modal-artist  (r/atom nil))
 (defonce modal-day     (r/atom nil))
 (defonce modal-closing (r/atom false))
+(defonce active-nav    (r/atom :stages))
 (defonce now-time      (r/atom (js/Date.now)))
 (.setInterval js/window #(reset! now-time (js/Date.now)) 30000)
 
@@ -323,6 +303,37 @@
       (for [p with-path]
         [place-svg-area p (catmull-rom-path (:path p))])]]))
 
+;; ── Bottom nav ───────────────────────────────────────────────────
+(defn nav-menu []
+  [:div.nav-menu
+   [:svg.nav-blob-bg {:viewBox "0 0 300 68" :preserveAspectRatio "none"}
+    [:defs
+     [:filter {:id "nav-amorph" :x "-15%" :y "-30%" :width "130%" :height "160%"}
+      [:feTurbulence {:type "fractalNoise" :baseFrequency "0.025" :numOctaves "2" :result "noise"}]
+      [:feDisplacementMap {:in "SourceGraphic" :in2 "noise" :scale "10"
+                           :xChannelSelector "R" :yChannelSelector "G" :result "warped"}]
+      [:feGaussianBlur {:in "warped" :stdDeviation "7" :result "glow"}]
+      [:feMerge
+       [:feMergeNode {:in "glow"}]
+       [:feMergeNode {:in "warped"}]]]]
+    [:rect {:x "8" :y "8" :width "284" :height "52" :rx "26" :ry "26"
+            :fill "rgba(0,168,150,0.18)" :stroke "#00a896" :stroke-width "1.5"
+            :filter "url(#nav-amorph)"}
+     [:animate {:attributeName "stroke"
+                :values "#00a896;#00d4aa;#00a896"
+                :dur "10s" :calcMode "spline"
+                :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
+                :repeatCount "indefinite"}]]]
+   [:div.nav-buttons
+    [:button.nav-btn
+     {:class (when (= @active-nav :timetable) "active")
+      :on-click #(reset! active-nav :timetable)}
+     "⊟ Timetable"]
+    [:button.nav-btn
+     {:class (when (= @active-nav :stages) "active")
+      :on-click #(reset! active-nav :stages)}
+     "◈ Stages"]]])
+
 ;; ── Transform clamping ───────────────────────────────────────────
 (defn- clamp-transform [{:keys [x y scale]}]
   (let [vw    (.-innerWidth js/window)
@@ -436,6 +447,9 @@
         (-> (js/fetch "/api/map-version")
             (.then #(.text %))
             (.then #(reset! map-ver %)))
+        (-> (js/fetch "/api/sim-route")
+            (.then #(.json %))
+            (.then #(reset! sim-route (js->clj % :keywordize-keys false))))
         (when-let [node @node-ref]
           (.addEventListener node "wheel" on-wheel #js {:passive false})
           (.addEventListener node "touchmove" on-touch-move #js {:passive false})))
@@ -496,9 +510,9 @@
 
               walk-step
               (fn walk-step [idx]
-                (if (>= idx (count sim-route))
+                (if (>= idx (count @sim-route))
                   (swap! state assoc :sim-done? true)
-                  (let [[lng lat] (nth sim-route idx)
+                  (let [[lng lat] (nth @sim-route idx)
                         to   [(lng->px lng) (lat->py lat)]
                         from (or @user-pos to)]
                     (reset! sim-idx idx)
@@ -510,7 +524,7 @@
                 (when @anim-frame (js/cancelAnimationFrame @anim-frame))
                 (reset! sim-idx 0)
                 (swap! state assoc :gps-status :found :sim-done? false)
-                (let [[lng lat] (first sim-route)]
+                (let [[lng lat] (first @sim-route)]
                   (reset! user-pos [(lng->px lng) (lat->py lat)]))
                 (walk-step 1))
 
@@ -542,6 +556,7 @@
              (place-areas)]]
            [place-modal]
            [artist-modal]
+           [nav-menu]
 
            (when dev?
              [:div.map-overlay__actions

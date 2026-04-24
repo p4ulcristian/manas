@@ -11,7 +11,8 @@
 (def ^:private project-root "/home/p4ulcristian/work/manas")
 (def ^:private places-path  (str project-root "/resources/places.edn"))
 (def ^:private artists-path (str project-root "/resources/artists.edn"))
-(def ^:private acts-path    (str project-root "/resources/acts.edn"))
+(def ^:private acts-path      (str project-root "/resources/acts.edn"))
+(def ^:private sim-route-path (str project-root "/resources/sim-route.edn"))
 
 (defn- load-edn [path]
   (try (edn/read-string (slurp path))
@@ -32,6 +33,12 @@
 (defn- save-acts! [acts]
   (io/make-parents acts-path)
   (spit acts-path (pr-str acts)))
+
+(defn- load-sim-route [] (load-edn sim-route-path))
+
+(defn- save-sim-route! [route]
+  (io/make-parents sim-route-path)
+  (spit sim-route-path (pr-str route)))
 
 (defn- parse-body [request]
   (json/parse-string (slurp (:body request)) true))
@@ -114,9 +121,19 @@
    :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
    :body    (json/generate-string body)})
 
-(defn- handle-get-places  [_] (json-response (load-places)))
-(defn- handle-get-artists [_] (json-response (load-artists)))
-(defn- handle-get-acts    [_] (json-response (load-acts)))
+(defn- handle-get-places    [_] (json-response (load-places)))
+(defn- handle-get-artists   [_] (json-response (load-artists)))
+(defn- handle-get-acts      [_] (json-response (load-acts)))
+(defn- handle-get-sim-route [_] (json-response (load-sim-route)))
+
+(defn- handle-put-sim-route [request]
+  (try
+    (let [body  (parse-body request)
+          route (:route body)]
+      (save-sim-route! route)
+      (json-response {:ok true}))
+    (catch Exception e
+      (json-response {:error (.getMessage e)} :status 400))))
 
 (defn- handle-post-artist [request]
   (try
@@ -285,6 +302,12 @@
 
       (and (= uri "/api/acts") (= method :get))
       (handle-get-acts request)
+
+      (and (= uri "/api/sim-route") (= method :get))
+      (handle-get-sim-route request)
+
+      (and (= uri "/api/sim-route") (= method :put))
+      (handle-put-sim-route request)
 
       (and (= uri "/api/acts") (= method :post))
       (handle-post-act request)

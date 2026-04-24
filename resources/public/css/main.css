@@ -851,3 +851,61 @@ img { display: block; max-width: 100%; }
 .place-modal__act-stage-icon {
   color: var(--gold); font-size: 0.8rem; opacity: 0.7;
 }
+
+/* ── Bottom nav ── */
+.nav-menu {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  width: 300px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-blob-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.nav-buttons {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 68px;
+  padding: 0 24px;
+}
+
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: rgba(0,168,150,0.7);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  padding: 6px 18px;
+  cursor: pointer;
+  border-radius: 16px;
+  transition: color 0.2s, background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-btn:hover {
+  color: #00d4aa;
+  background: rgba(0,168,150,0.08);
+}
+
+.nav-btn.active {
+  color: #00d4aa;
+  font-weight: 700;
+  background: rgba(0,168,150,0.15);
+}
