@@ -807,3 +807,22 @@ img { display: block; max-width: 100%; }
 .place-modal__no-acts {
   color: #555; font-size: 0.85rem; padding: 12px 0; text-align: center;
 }
+
+/* artist / place description additions */
+.place-modal__place-desc {
+  color: #aaa; font-size: 0.8rem; padding: 0 20px 10px;
+  text-align: center; font-style: italic; line-height: 1.4;
+}
+.place-modal__artist-bio {
+  color: #bbb; font-size: 0.85rem; padding: 8px 20px 14px;
+  text-align: center; line-height: 1.5;
+}
+.place-modal__act-name[style*='cursor'] {
+  text-decoration: underline dotted rgba(201,168,76,0.5);
+}
+.place-modal__act-name:hover {
+  color: var(--gold);
+}
+.place-modal__act-stage-icon {
+  color: var(--gold); font-size: 0.8rem; opacity: 0.7;
+}

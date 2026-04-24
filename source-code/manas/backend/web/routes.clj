@@ -9,11 +9,17 @@
            [java.nio.file Files Paths]))
 
 (def ^:private project-root "/home/p4ulcristian/work/manas")
-(def ^:private places-path (str project-root "/resources/places.edn"))
+(def ^:private places-path  (str project-root "/resources/places.edn"))
+(def ^:private artists-path (str project-root "/resources/artists.edn"))
+(def ^:private acts-path    (str project-root "/resources/acts.edn"))
 
-(defn- load-places []
-  (try (edn/read-string (slurp places-path))
+(defn- load-edn [path]
+  (try (edn/read-string (slurp path))
        (catch Exception _ [])))
+
+(defn- load-places  [] (load-edn places-path))
+(defn- load-artists [] (load-edn artists-path))
+(defn- load-acts    [] (load-edn acts-path))
 
 (defn- save-places! [places]
   (io/make-parents places-path)
@@ -92,21 +98,23 @@
                };
                reader.readAsDataURL(file);
              });"
-            )]]])))
+            )]]])
+))
 
 (defn- json-response [body & {:keys [status] :or {status 200}}]
   {:status  status
    :headers {"Content-Type" "application/json" "Access-Control-Allow-Origin" "*"}
    :body    (json/generate-string body)})
 
-(defn- handle-get-places [_]
-  (json-response (load-places)))
+(defn- handle-get-places  [_] (json-response (load-places)))
+(defn- handle-get-artists [_] (json-response (load-artists)))
+(defn- handle-get-acts    [_] (json-response (load-acts)))
 
 (defn- handle-post-place [request]
   (try
     (let [body  (parse-body request)
-          place (merge {:id (str (UUID/randomUUID)) :name "" :type "other" :icon "◉" :x 0 :y 0}
-                       (select-keys body [:name :type :icon :x :y]))
+          place (merge {:id (str (UUID/randomUUID)) :name "" :type "other" :icon "O" :x 0 :y 0 :description ""}
+                       (select-keys body [:name :type :icon :x :y :description]))
           all   (conj (load-places) place)]
       (save-places! all)
       (json-response place :status 201))
@@ -119,7 +127,7 @@
           places  (load-places)
           updated (mapv (fn [p]
                           (if (= (:id p) id)
-                            (merge p (select-keys body [:name :type :icon :x :y]))
+                            (merge p (select-keys body [:name :type :icon :x :y :description]))
                             p))
                         places)]
       (if (some #(= (:id %) id) places)
@@ -191,13 +199,16 @@
       (and (clojure.string/starts-with? uri "/api/places/") (= method :delete))
       (handle-delete-place (subs uri (count "/api/places/")))
 
+      (and (= uri "/api/artists") (= method :get))
+      (handle-get-artists request)
+
+      (and (= uri "/api/acts") (= method :get))
+      (handle-get-acts request)
+
       (clojure.string/starts-with? uri "/images/")
       (serve-file uri)
 
       (clojure.string/starts-with? uri "/css/")
-      (serve-file uri)
-
-      (clojure.string/starts-with? uri "/js/")
       (serve-file uri)
 
       (clojure.string/starts-with? uri "/js/")

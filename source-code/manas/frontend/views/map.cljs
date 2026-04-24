@@ -2,7 +2,6 @@
   (:require [reagent.core :as r]))
 
 ;; ── Image georeferencing ──────────────────────────────────────────
-;; Image: 1792x2048px covering exactly these bounds
 (def img-w 1440)
 (def img-h 1920)
 (def img-north 46.26629084547643)
@@ -65,9 +64,12 @@
                            (< lng (+ (* (/ (- xj xi) (- yj yi)) (- lat yi)) xi)))]
           (recur (inc i) i (if cross? (not inside) inside)))))))
 
-;; ── API places state ─────────────────────────────────────────────
+;; ── State atoms ──────────────────────────────────────────────────
 (defonce api-places    (r/atom []))
+(defonce api-artists   (r/atom []))
+(defonce api-acts      (r/atom []))
 (defonce modal-place   (r/atom nil))
+(defonce modal-artist  (r/atom nil))
 (defonce modal-day     (r/atom nil))
 (defonce modal-closing (r/atom false))
 (defonce now-time      (r/atom (js/Date.now)))
@@ -84,7 +86,17 @@
       (.then #(.json %))
       (.then #(reset! api-places (js->clj % :keywordize-keys true)))))
 
-;; ── Place modal sheet ─────────────────────────────────────────────
+(defn fetch-artists! []
+  (-> (js/fetch "/api/artists")
+      (.then #(.json %))
+      (.then #(reset! api-artists (js->clj % :keywordize-keys true)))))
+
+(defn fetch-acts! []
+  (-> (js/fetch "/api/acts")
+      (.then #(.json %))
+      (.then #(reset! api-acts (js->clj % :keywordize-keys true)))))
+
+;; ── Timetable helpers ─────────────────────────────────────────────
 (defn- act->ms [date-str time-str]
   (when (seq time-str)
     (let [[h m] (map js/parseInt (.split time-str ":"))
@@ -102,59 +114,116 @@
       (pos? h) (str h "h " m "m")
       :else    (str m "min"))))
 
-(defn- modal-acts [schedule day]
-  (let [entry  (first (filter #(= (:date %) day) schedule))
-        acts   (:acts entry)
-        now    @now-time
-        dated  (mapv #(assoc % :ms (act->ms day (:time %))) acts)
-        past   (filterv #(and (:ms %) (< (:ms %) now)) dated)
-        future (filterv #(or (nil? (:ms %)) (>= (:ms %) now)) dated)
-]
-    (if (seq acts)
+(def ^:private day-labels
+  {"2026-07-08" "Wed" "2026-07-09" "Thu" "2026-07-10" "Fri"
+   "2026-07-11" "Sat" "2026-07-12" "Sun" "2026-07-13" "Mon"})
+
+;; ── Place timetable panel ─────────────────────────────────────────
+(defn- modal-acts [place-id day]
+  (let [artist-map (->> @api-artists (map (juxt :id identity)) (into {}))
+        day-acts   (->> @api-acts
+                        (filter #(and (= (:place-id %) place-id) (= (:date %) day)))
+                        (sort-by #(let [[h] (map js/parseInt (.split (:time %) ":"))]
+                                    (if (< h 7) (+ h 24) h))))
+        now        @now-time
+        dated      (mapv #(assoc % :ms (act->ms day (:time %))) day-acts)
+        past       (filterv #(and (:ms %) (< (:ms %) now)) dated)
+        future     (filterv #(or (nil? (:ms %)) (>= (:ms %) now)) dated)]
+    (if (seq day-acts)
       [:div.place-modal__acts
        (for [a past]
-         [:div.place-modal__act.past {:key (:name a)}
-          [:span.place-modal__act-time (:time a)]
-          [:div.place-modal__act-info
-           [:span.place-modal__act-name (:name a)]
-           (when (seq (:description a)) [:span.place-modal__act-desc (:description a)])]])
+         (let [artist (get artist-map (:artist-id a))]
+           [:div.place-modal__act.past {:key (:id a)}
+            [:span.place-modal__act-time (:time a)]
+            [:div.place-modal__act-info
+             [:span.place-modal__act-name
+              {:on-click (fn [e] (.stopPropagation e) (reset! modal-artist artist))
+               :style {:cursor "pointer"}}
+              (:name artist)]
+             (when (seq (:description artist))
+               [:span.place-modal__act-desc (:description artist)])]]))
        [:div.place-modal__now-line
-        {:ref #(when % (js/setTimeout (fn [] (.scrollIntoView % #js {:behavior "smooth" :block "nearest"})) 120))}
+        {:ref #(when % (js/setTimeout
+                         (fn [] (.scrollIntoView % #js {:behavior "smooth" :block "nearest"}))
+                         120))}
         [:span.place-modal__now-label
-        (let [d (js/Date. @now-time)
-              h (.getHours d)
-              m (.getMinutes d)]
-          (str (when (< h 10) "0") h ":" (when (< m 10) "0") m))]]
+         (let [d (js/Date. @now-time)
+               h (.getHours d)
+               m (.getMinutes d)]
+           (str (when (< h 10) "0") h ":" (when (< m 10) "0") m))]]
        (for [a future]
-         [:div.place-modal__act {:key (:name a)}
-          [:span.place-modal__act-time (:time a)]
-          [:div.place-modal__act-info
-           [:span.place-modal__act-name (:name a)]
-           (when (seq (:description a)) [:span.place-modal__act-desc (:description a)])]
-          (when (:ms a) [:span.place-modal__act-countdown (countdown (:ms a) now)])])]
+         (let [artist (get artist-map (:artist-id a))]
+           [:div.place-modal__act {:key (:id a)}
+            [:span.place-modal__act-time (:time a)]
+            [:div.place-modal__act-info
+             [:span.place-modal__act-name
+              {:on-click (fn [e] (.stopPropagation e) (reset! modal-artist artist))
+               :style {:cursor "pointer"}}
+              (:name artist)]
+             (when (seq (:description artist))
+               [:span.place-modal__act-desc (:description artist)])]
+            (when (:ms a)
+              [:span.place-modal__act-countdown (countdown (:ms a) now)])]))]
       [:div.place-modal__no-acts "Lineup TBA"])))
 
+;; ── Place modal ───────────────────────────────────────────────────
 (defn place-modal []
   (when-let [p @modal-place]
-    (let [schedule (or (:schedule p) [])
-          active   (or @modal-day (some-> schedule first :date))]
+    (let [place-id (:id p)
+          dates    (->> @api-acts
+                        (filter #(= (:place-id %) place-id))
+                        (map :date)
+                        distinct
+                        sort)
+          active   (or @modal-day (first dates))]
       [:div.place-modal
        {:class    (when @modal-closing "closing")
         :on-click close-modal!}
        [:div.place-modal__sheet
         {:on-click #(.stopPropagation %)}
-        [:button.place-modal__close {:on-click close-modal!} "✕"]
+        [:button.place-modal__close {:on-click close-modal!} "\u2715"]
         [:div.place-modal__header
-         [:span.place-modal__icon (or (:icon p) "◉")]
+         [:span.place-modal__icon (or (:icon p) "O")]
          [:span.place-modal__name (:name p)]]
-        [:div.place-modal__days
-         (for [{:keys [date label]} schedule]
-           [:div.place-modal__day-tab
-            {:key     date
-             :class   (when (= date active) "active")
-             :on-click (fn [e] (.stopPropagation e) (reset! modal-day date))}
-            label])]
-        (modal-acts schedule active)]])))
+        (when (seq (:description p))
+          [:div.place-modal__place-desc (:description p)])
+        (when (seq dates)
+          [:div.place-modal__days
+           (for [d dates]
+             [:div.place-modal__day-tab
+              {:key      d
+               :class    (when (= d active) "active")
+               :on-click (fn [e] (.stopPropagation e) (reset! modal-day d))}
+              (get day-labels d d)])])
+        (modal-acts place-id active)]])))
+
+;; ── Artist modal ──────────────────────────────────────────────────
+(defn artist-modal []
+  (when-let [a @modal-artist]
+    (let [place-map (->> @api-places (map (juxt :id identity)) (into {}))
+          a-acts    (->> @api-acts
+                         (filter #(= (:artist-id %) (:id a)))
+                         (sort-by #(str (:date %) (:time %))))]
+      [:div.place-modal.artist-modal
+       {:on-click #(reset! modal-artist nil)}
+       [:div.place-modal__sheet
+        {:on-click #(.stopPropagation %)}
+        [:button.place-modal__close {:on-click #(reset! modal-artist nil)} "\u2715"]
+        [:div.place-modal__header
+         [:span.place-modal__name (:name a)]]
+        [:div.place-modal__artist-bio (:description a)]
+        [:div.place-modal__acts
+         (if (seq a-acts)
+           (for [act a-acts]
+             (let [place (get place-map (:place-id act))]
+               [:div.place-modal__act {:key (:id act)}
+                [:span.place-modal__act-time
+                 (str (get day-labels (:date act) (:date act)) " " (:time act))]
+                [:div.place-modal__act-info
+                 [:span.place-modal__act-name (:name place)]
+                 (when (:icon place)
+                   [:span.place-modal__act-stage-icon (:icon place)])]]))
+           [:div.place-modal__no-acts "No performances scheduled"])]]])))
 
 ;; ── API place buttons (pixel-positioned) ─────────────────────────
 (defn place-buttons []
@@ -174,8 +243,6 @@
      [:span.sparkle.s6]]))
 
 ;; ── Transform clamping ───────────────────────────────────────────
-;; Keeps the map on screen: if image fills viewport, allow full pan;
-;; if image is smaller than viewport, center it.
 (defn- clamp-transform [{:keys [x y scale]}]
   (let [vw    (.-innerWidth js/window)
         vh    (.-innerHeight js/window)
@@ -200,7 +267,6 @@
         transform  (r/atom {:x 0 :y 0 :scale 1})
         user-pos   (r/atom nil)
         map-ver    (r/atom "0")
-        ;; touch tracking (plain atoms — no re-render needed)
         touch-ref  (atom {:dragging false :pinching false
                           :last-x 0 :last-y 0
                           :pinch-dist 0 :pinch-cx 0 :pinch-cy 0})
@@ -209,8 +275,6 @@
         anim-frame (atom nil)
         node-ref   (atom nil)
 
-        ;; Shared animation: smoothly move user-pos from pixel [fx fy] to [tx ty].
-        ;; Calls on-done when complete. Cancels any running animation first.
         animate-px (fn [from to on-done]
                      (when @anim-frame (js/cancelAnimationFrame @anim-frame))
                      (let [t0  (js/performance.now)
@@ -286,6 +350,8 @@
               ty (/ (- vh (* img-h s)) 2)]
           (reset! transform {:x tx :y ty :scale s}))
         (fetch-places!)
+        (fetch-artists!)
+        (fetch-acts!)
         (-> (js/fetch "/api/map-version")
             (.then #(.text %))
             (.then #(reset! map-ver %)))
@@ -387,25 +453,24 @@
                     :width img-w :height img-h
                     :draggable false
                     :style {:display "block" :user-select "none"}}]
-             ;; User dot
              (when upos
                [:div.map-user-dot
                 {:style {:position "absolute"
                          :left (first upos) :top (second upos)
                          :transform "translate(-50%,-50%)"}}])
-             ;; API place buttons
              (place-buttons)]]
            [place-modal]
+           [artist-modal]
 
            [:div.map-overlay__actions
             [:button.map-btn {:on-click start-gps}
              (case gps-status
-               :idle    "◎ Locate me"
-               :loading "Searching…"
-               :found   (if inside? "✓ You are here" "⚠ Outside festival")
+               :idle    "\u25ce Locate me"
+               :loading "Searching\u2026"
+               :found   (if inside? "\u2713 You are here" "\u26a0 Outside festival")
                :error   "GPS unavailable"
-               "◎ Locate me")]
+               "\u25ce Locate me")]
             [:button.map-btn.map-btn--sim {:on-click start-sim}
-             (if sim-done? "↺ Again" "▶ Simulate")]
+             (if sim-done? "\u21ba Again" "\u25b6 Simulate")]
             (when (and (pos? @sim-idx) (not sim-done?))
-              [:button.map-btn.map-btn--stop {:on-click stop-sim} "◼ Stop"])]]))})))
+              [:button.map-btn.map-btn--stop {:on-click stop-sim} "\u25fc Stop"])]]))})))

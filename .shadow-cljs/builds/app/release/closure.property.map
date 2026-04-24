@@ -30,6 +30,8 @@ cljs$core$IChunkedSeq$_chunked_first$arity$1:ac
 cljs$core$IChunkedSeq$_chunked_rest$arity$1:Mb
 cljs$core$ICollection$:md
 cljs$core$ICollection$_conj$arity$2:ia
+cljs$core$IComparable$:u
+cljs$core$IComparable$_compare$arity$2:i
 cljs$core$ICounted$:vc
 cljs$core$ICounted$_count$arity$1:ea
 cljs$core$IDeref$_deref$arity$1:La
