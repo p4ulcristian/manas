@@ -383,7 +383,7 @@ function savePath(p) {
   fetch('/api/places/' + p.id, {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({path: p.path})
-  }).then(function() { setStatus('Path saved'); renderPlaceList(); })
+  }).then(function() { setStatus('Path saved'); renderPlaceList(); renderSvg(); })
     .catch(function() { setStatus('Save failed', true); });
 }
 
