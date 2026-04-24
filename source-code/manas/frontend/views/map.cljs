@@ -1,5 +1,6 @@
 (ns manas.frontend.views.map
-  (:require [reagent.core :as r]))
+  (:require [reagent.core :as r]
+            [clojure.string :as str]))
 
 ;; ── Image georeferencing ──────────────────────────────────────────
 (def img-w 1440)
@@ -225,22 +226,44 @@
                    [:span.place-modal__act-stage-icon (:icon place)])]]))
            [:div.place-modal__no-acts "No performances scheduled"])]]])))
 
-;; ── API place buttons (pixel-positioned) ─────────────────────────
-(defn place-buttons []
-  (for [p @api-places]
-    [:div.place-btn
-     {:key      (:id p)
-      :style    {:position "absolute"
-                 :left     (:x p)
-                 :top      (:y p)
-                 :transform "translate(-50%,-50%)"}
-      :on-click (fn [e] (.stopPropagation e) (reset! modal-day nil) (reset! modal-place p))}
-     [:span.sparkle.s1]
-     [:span.sparkle.s2]
-     [:span.sparkle.s3]
-     [:span.sparkle.s4]
-     [:span.sparkle.s5]
-     [:span.sparkle.s6]]))
+;; ── Catmull-Rom smooth path ──────────────────────────────────────
+(defn- cr-seg [pts n i]
+  (let [pt   (fn [j] (nth pts (mod (+ j n) n)))
+        [p0x p0y] (pt (dec i))
+        [p1x p1y] (pt i)
+        [p2x p2y] (pt (inc i))
+        [p3x p3y] (pt (+ i 2))
+        cp1x (+ p1x (/ (- p2x p0x) 6))
+        cp1y (+ p1y (/ (- p2y p0y) 6))
+        cp2x (- p2x (/ (- p3x p1x) 6))
+        cp2y (- p2y (/ (- p3y p1y) 6))]
+    (str "C " cp1x "," cp1y " " cp2x "," cp2y " " p2x "," p2y)))
+
+(defn- catmull-rom-path [pts]
+  (when (>= (count pts) 3)
+    (let [n       (count pts)
+          [sx sy] (first pts)]
+      (str "M " sx "," sy " "
+           (str/join " " (map #(cr-seg pts n %) (range n)))
+           " Z"))))
+
+;; ── API place areas (SVG Catmull-Rom, pixel-positioned) ──────────
+(defn place-areas []
+  [:svg {:style {:position "absolute" :left 0 :top 0
+                 :width img-w :height img-h
+                 :overflow "visible" :pointer-events "none"}}
+   (for [p @api-places]
+     (when-let [d (catmull-rom-path (:path p))]
+       [:path {:key          (:id p)
+               :d            d
+               :fill         "rgba(201,168,76,0.18)"
+               :stroke       "#c9a84c"
+               :stroke-width 3
+               :style        {:cursor "pointer" :pointer-events "all"}
+               :on-click     (fn [e]
+                               (.stopPropagation e)
+                               (reset! modal-day nil)
+                               (reset! modal-place p))}]))])
 
 ;; ── Transform clamping ───────────────────────────────────────────
 (defn- clamp-transform [{:keys [x y scale]}]
@@ -458,7 +481,7 @@
                 {:style {:position "absolute"
                          :left (first upos) :top (second upos)
                          :transform "translate(-50%,-50%)"}}])
-             (place-buttons)]]
+             (place-areas)]]
            [place-modal]
            [artist-modal]
 

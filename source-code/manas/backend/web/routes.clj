@@ -185,8 +185,8 @@
 (defn- handle-post-place [request]
   (try
     (let [body  (parse-body request)
-          place (merge {:id (str (UUID/randomUUID)) :name "" :type "other" :icon "O" :x 0 :y 0 :description ""}
-                       (select-keys body [:name :type :icon :x :y :description]))
+          place (merge {:id (str (UUID/randomUUID)) :name "" :type "other" :icon "O" :path [] :description ""}
+                       (select-keys body [:name :type :icon :path :description]))
           all   (conj (load-places) place)]
       (save-places! all)
       (json-response place :status 201))
@@ -199,7 +199,7 @@
           places  (load-places)
           updated (mapv (fn [p]
                           (if (= (:id p) id)
-                            (merge p (select-keys body [:name :type :icon :x :y :description]))
+                            (merge p (select-keys body [:name :type :icon :path :description]))
                             p))
                         places)]
       (if (some #(= (:id %) id) places)

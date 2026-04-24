@@ -16,15 +16,11 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
 .tab-btn.active { color:#c9a84c; border-bottom-color:#c9a84c; }
 .tab-panel { display:none; flex:1; overflow:hidden; }
 .tab-panel.active { display:flex; }
-/* Places tab */
 #main { display:flex; flex:1; overflow:hidden; }
 #map-area { flex:1; overflow:auto; padding:16px; }
-#map-wrap { position:relative; display:inline-block; cursor:crosshair; }
+#map-wrap { position:relative; display:inline-block; }
 #map-img { display:block; max-width:none; }
-.place-dot { position:absolute; width:24px; height:24px; border-radius:50%; background:rgba(201,168,76,0.85); border:2px solid #fff; transform:translate(-50%,-50%); cursor:grab; display:flex; align-items:center; justify-content:center; font-size:9px; color:#111; font-weight:700; text-align:center; user-select:none; }
-.place-dot:active { cursor:grabbing; }
-.place-dot.selected { background:rgba(255,100,100,0.9); border-color:#ff4444; }
-/* Sidebar shared */
+#map-svg { position:absolute; top:0; left:0; overflow:visible; pointer-events:none; }
 .sidebar { width:280px; background:#111; border-left:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
 .sidebar h2 { font-size:.9rem; color:#c9a84c; margin-bottom:4px; }
 .sidebar label { font-size:.78rem; color:#aaa; display:block; margin-bottom:3px; }
@@ -37,15 +33,14 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
 .btn.del:hover { background:#ff6666; }
 .btn.sec { background:#333; color:#eee; border:1px solid #555; }
 .btn.sec:hover { background:#444; }
-.btn-row { display:flex; gap:8px; }
-/* List items */
+.btn.active-mode { background:#4a9eff; color:#fff; }
+.btn-row { display:flex; gap:8px; flex-wrap:wrap; }
 .item-list { display:flex; flex-direction:column; gap:6px; }
 .list-item { background:#1e1e1e; border:1px solid #333; border-radius:6px; padding:8px 10px; cursor:pointer; font-size:.82rem; }
 .list-item:hover { border-color:#c9a84c; }
 .list-item.selected { border-color:#ff4444; }
 .list-item .iname { font-weight:600; }
 .list-item .isub { color:#666; font-size:.75rem; margin-top:2px; }
-/* Artists/Acts full panel */
 .full-panel { display:flex; flex:1; overflow:hidden; }
 .list-col { width:300px; background:#111; border-right:1px solid #333; padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
 .list-col h2 { font-size:.9rem; color:#c9a84c; }
@@ -81,10 +76,12 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
   <div id="map-area">
     <div id="map-wrap">
       <img id="map-img" src="/images/festival-map.png" draggable="false">
+      <svg id="map-svg"></svg>
     </div>
   </div>
   <div class="sidebar">
     <h2>Places</h2>
+    <button class="btn" onclick="newPlace()">+ Add Place</button>
     <div id="place-list" class="item-list"></div>
     <hr>
     <h2>Edit selected</h2>
@@ -105,6 +102,13 @@ body { background: #1a1a1a; color: #eee; font-family: sans-serif; display: flex;
       <button class="btn" onclick="savePlace()">Save</button>
       <button class="btn del" onclick="deletePlace()">Delete</button>
     </div>
+    <hr>
+    <h2>Path</h2>
+    <div class="btn-row">
+      <button id="draw-btn" class="btn sec" onclick="toggleDraw()">Draw Path</button>
+      <button class="btn sec" onclick="clearPath()">Clear</button>
+    </div>
+    <div style="font-size:.75rem;color:#666;margin-top:4px">Draw: click map to add vertices. Click first vertex to close. Drag vertices to adjust.</div>
   </div>
 </div>
 
@@ -161,6 +165,7 @@ var places = [], artists = [], acts = [];
 var selectedPlace = null, selectedArtist = null, selectedAct = null;
 var scale = 0.5;
 var IMG_W = 1440, IMG_H = 1920;
+var drawMode = false;
 
 function setStatus(msg, err) {
   var el = document.getElementById('status');
@@ -177,49 +182,221 @@ function switchTab(name) {
     if (b.textContent.toLowerCase() === name) b.classList.add('active');
   });
   document.getElementById('zoom-ctrl').style.display = name === 'places' ? 'flex' : 'none';
-  var hints = { places: 'Click map to add · Drag dot to reposition · Select to edit/delete',
-                artists: 'Click an artist to edit, or add a new one',
-                acts: 'Click an act to edit, or add a new one' };
+  var hints = {
+    places: 'Select place → Draw Path → click map to add vertices',
+    artists: 'Click an artist to edit, or add a new one',
+    acts: 'Click an act to edit, or add a new one'
+  };
   document.getElementById('toolbar-hint').textContent = hints[name] || '';
 }
 
-// ── PLACES ────────────────────────────────────────────────────
+// ── zoom ─────────────────────────────────────────────────────
 function setScale(s) {
   scale = Math.max(0.1, Math.min(3, s));
   var img = document.getElementById('map-img');
+  var svg = document.getElementById('map-svg');
   img.style.width  = (IMG_W * scale) + 'px';
   img.style.height = (IMG_H * scale) + 'px';
+  svg.style.width  = (IMG_W * scale) + 'px';
+  svg.style.height = (IMG_H * scale) + 'px';
+  svg.setAttribute('viewBox', '0 0 ' + IMG_W + ' ' + IMG_H);
   document.getElementById('zoom-label').textContent = Math.round(scale * 100) + '%';
-  renderPlaces();
+  renderSvg();
 }
 function zoom(delta) { setScale(scale + delta); }
 
-function renderPlaces() {
-  document.querySelectorAll('.place-dot').forEach(function(d) { d.remove(); });
-  var wrap = document.getElementById('map-wrap');
-  places.forEach(function(p) {
-    var dot = document.createElement('div');
-    dot.className = 'place-dot' + (selectedPlace === p.id ? ' selected' : '');
-    dot.style.left = (p.x * scale) + 'px';
-    dot.style.top  = (p.y * scale) + 'px';
-    dot.title = p.name;
-    dot.textContent = (p.icon || p.name || '').substring(0, 3);
-    dot.dataset.id = p.id;
-    makeDraggable(dot, p);
-    dot.addEventListener('click', function(e) { e.stopPropagation(); selectPlace(p.id); });
-    wrap.appendChild(dot);
-  });
-  renderPlaceList();
+// ── Catmull-Rom path ──────────────────────────────────────────
+function crSeg(pts, n, i) {
+  function pt(j) { return pts[((j % n) + n) % n]; }
+  var p0 = pt(i - 1), p1 = pt(i), p2 = pt(i + 1), p3 = pt(i + 2);
+  var cp1x = p1[0] + (p2[0] - p0[0]) / 6;
+  var cp1y = p1[1] + (p2[1] - p0[1]) / 6;
+  var cp2x = p2[0] - (p3[0] - p1[0]) / 6;
+  var cp2y = p2[1] - (p3[1] - p1[1]) / 6;
+  return 'C ' + cp1x + ',' + cp1y + ' ' + cp2x + ',' + cp2y + ' ' + p2[0] + ',' + p2[1];
 }
 
+function catmullRomPath(pts) {
+  if (!pts || pts.length < 3) return null;
+  var n = pts.length;
+  var segs = [];
+  for (var i = 0; i < n; i++) segs.push(crSeg(pts, n, i));
+  return 'M ' + pts[0][0] + ',' + pts[0][1] + ' ' + segs.join(' ') + ' Z';
+}
+
+// ── SVG render ────────────────────────────────────────────────
+function renderSvg() {
+  var svg = document.getElementById('map-svg');
+  svg.innerHTML = '';
+
+  // all place areas
+  places.forEach(function(p) {
+    var d = catmullRomPath(p.path);
+    if (!d) return;
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', selectedPlace === p.id ? 'rgba(255,100,100,0.18)' : 'rgba(201,168,76,0.18)');
+    path.setAttribute('stroke', selectedPlace === p.id ? '#ff4444' : '#c9a84c');
+    path.setAttribute('stroke-width', '3');
+    path.style.cursor = 'pointer';
+    path.style.pointerEvents = 'all';
+    path.addEventListener('click', function(e) {
+      if (!drawMode) { e.stopPropagation(); selectPlace(p.id); }
+    });
+    svg.appendChild(path);
+  });
+
+  // selected place: label at centroid
+  var sp = selectedPlace ? places.find(function(p) { return p.id === selectedPlace; }) : null;
+  if (sp && sp.path && sp.path.length > 0) {
+    var cx = sp.path.reduce(function(s, v) { return s + v[0]; }, 0) / sp.path.length;
+    var cy = sp.path.reduce(function(s, v) { return s + v[1]; }, 0) / sp.path.length;
+    var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', cx);
+    txt.setAttribute('y', cy);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.setAttribute('fill', '#fff');
+    txt.setAttribute('font-size', '28');
+    txt.setAttribute('pointer-events', 'none');
+    txt.textContent = (sp.icon || '') + ' ' + (sp.name || '');
+    svg.appendChild(txt);
+
+    // vertex handles
+    sp.path.forEach(function(v, idx) {
+      var c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('cx', v[0]);
+      c.setAttribute('cy', v[1]);
+      c.setAttribute('r', idx === 0 ? '14' : '10');
+      c.setAttribute('fill', idx === 0 ? 'rgba(74,158,255,0.8)' : 'rgba(201,168,76,0.85)');
+      c.setAttribute('stroke', '#fff');
+      c.setAttribute('stroke-width', '2');
+      c.style.cursor = drawMode && idx === 0 ? 'crosshair' : 'grab';
+      c.style.pointerEvents = 'all';
+
+      // close polygon by clicking first vertex in draw mode
+      if (drawMode && idx === 0 && sp.path.length >= 3) {
+        c.addEventListener('click', function(e) {
+          e.stopPropagation();
+          finishDraw();
+        });
+      } else {
+        makeVertexDraggable(c, sp, idx);
+        // right-click to delete vertex
+        c.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          sp.path.splice(idx, 1);
+          savePath(sp);
+        });
+      }
+      svg.appendChild(c);
+    });
+  }
+
+  // all other places: name labels
+  places.forEach(function(p) {
+    if (p === sp || !p.path || p.path.length < 3) return;
+    var cx = p.path.reduce(function(s, v) { return s + v[0]; }, 0) / p.path.length;
+    var cy = p.path.reduce(function(s, v) { return s + v[1]; }, 0) / p.path.length;
+    var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    txt.setAttribute('x', cx);
+    txt.setAttribute('y', cy);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.setAttribute('fill', '#c9a84c');
+    txt.setAttribute('font-size', '22');
+    txt.setAttribute('pointer-events', 'none');
+    txt.textContent = (p.icon || '') + ' ' + (p.name || '');
+    svg.appendChild(txt);
+  });
+}
+
+// ── vertex drag ───────────────────────────────────────────────
+function makeVertexDraggable(circle, place, idx) {
+  var dragging = false;
+  circle.addEventListener('mousedown', function(e) {
+    e.preventDefault(); e.stopPropagation(); dragging = true;
+    function onMove(ev) {
+      if (!dragging) return;
+      var rect = document.getElementById('map-img').getBoundingClientRect();
+      var x = Math.round(Math.max(0, Math.min(IMG_W, (ev.clientX - rect.left) / scale)));
+      var y = Math.round(Math.max(0, Math.min(IMG_H, (ev.clientY - rect.top)  / scale)));
+      place.path[idx] = [x, y];
+      renderSvg();
+    }
+    function onUp() {
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      savePath(place);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// ── draw mode ─────────────────────────────────────────────────
+function toggleDraw() {
+  if (!selectedPlace) { setStatus('Select a place first', true); return; }
+  drawMode = !drawMode;
+  var btn = document.getElementById('draw-btn');
+  btn.textContent = drawMode ? 'Done' : 'Draw Path';
+  btn.className   = drawMode ? 'btn active-mode' : 'btn sec';
+  document.getElementById('map-wrap').style.cursor = drawMode ? 'crosshair' : 'default';
+  setStatus(drawMode ? 'Click map to add vertices. Click first vertex (blue) to close.' : 'Draw mode off');
+  renderSvg();
+}
+
+function finishDraw() {
+  drawMode = false;
+  var btn = document.getElementById('draw-btn');
+  btn.textContent = 'Draw Path';
+  btn.className   = 'btn sec';
+  document.getElementById('map-wrap').style.cursor = 'default';
+  setStatus('Path closed');
+  renderSvg();
+}
+
+function clearPath() {
+  var p = places.find(function(x) { return x.id === selectedPlace; });
+  if (!p) return;
+  p.path = [];
+  savePath(p);
+}
+
+// ── map click → add vertex ────────────────────────────────────
+document.getElementById('map-wrap').addEventListener('click', function(e) {
+  if (!drawMode || !selectedPlace) return;
+  var rect = document.getElementById('map-img').getBoundingClientRect();
+  var x = Math.round((e.clientX - rect.left) / scale);
+  var y = Math.round((e.clientY - rect.top)  / scale);
+  var p = places.find(function(px) { return px.id === selectedPlace; });
+  if (!p) return;
+  if (!p.path) p.path = [];
+  p.path.push([x, y]);
+  renderSvg();
+  savePath(p);
+});
+
+// ── API helpers ───────────────────────────────────────────────
+function savePath(p) {
+  fetch('/api/places/' + p.id, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: p.path})
+  }).then(function() { setStatus('Path saved'); renderPlaceList(); })
+    .catch(function() { setStatus('Save failed', true); });
+}
+
+// ── PLACES ────────────────────────────────────────────────────
 function renderPlaceList() {
   var list = document.getElementById('place-list');
   list.innerHTML = '';
   places.forEach(function(p) {
     var item = document.createElement('div');
     item.className = 'list-item' + (selectedPlace === p.id ? ' selected' : '');
+    var pts = p.path ? p.path.length : 0;
     item.innerHTML = '<div class="iname">' + (p.icon ? p.icon + ' ' : '') + (p.name || 'unnamed') + '</div>' +
-      '<div class="isub">x:' + Math.round(p.x) + ' y:' + Math.round(p.y) + ' · ' + (p.type || '') + '</div>';
+      '<div class="isub">' + pts + ' vertices · ' + (p.type || '') + '</div>';
     item.onclick = function() { selectPlace(p.id); };
     list.appendChild(item);
   });
@@ -227,6 +404,11 @@ function renderPlaceList() {
 
 function selectPlace(id) {
   selectedPlace = id;
+  drawMode = false;
+  var btn = document.getElementById('draw-btn');
+  btn.textContent = 'Draw Path';
+  btn.className = 'btn sec';
+  document.getElementById('map-wrap').style.cursor = 'default';
   var p = places.find(function(x) { return x.id === id; });
   if (p) {
     document.getElementById('f-name').value = p.name || '';
@@ -234,50 +416,23 @@ function selectPlace(id) {
     document.getElementById('f-icon').value = p.icon || '';
     document.getElementById('f-desc').value = p.description || '';
   }
-  renderPlaces();
+  renderPlaceList();
+  renderSvg();
 }
 
-function makeDraggable(dot, p) {
-  var dragging = false, startX, startY, origX, origY;
-  dot.addEventListener('mousedown', function(e) {
-    e.preventDefault(); dragging = true;
-    startX = e.clientX; startY = e.clientY;
-    origX = p.x; origY = p.y;
-    function onMove(ev) {
-      if (!dragging) return;
-      p.x = Math.round(Math.max(0, Math.min(IMG_W, origX + (ev.clientX - startX) / scale)));
-      p.y = Math.round(Math.max(0, Math.min(IMG_H, origY + (ev.clientY - startY) / scale)));
-      dot.style.left = (p.x * scale) + 'px';
-      dot.style.top  = (p.y * scale) + 'px';
-    }
-    function onUp() {
-      dragging = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      fetch('/api/places/' + p.id, {
-        method: 'PUT', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({x: p.x, y: p.y})
-      }).then(function() { setStatus('Moved ' + (p.name || p.id)); renderPlaceList(); })
-        .catch(function() { setStatus('Move failed', true); });
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-}
-
-document.getElementById('map-wrap').addEventListener('click', function(e) {
-  var img = document.getElementById('map-img');
-  var rect = img.getBoundingClientRect();
-  var x = Math.round((e.clientX - rect.left) / scale);
-  var y = Math.round((e.clientY - rect.top)  / scale);
+function newPlace() {
   fetch('/api/places', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name: 'New Place', type: 'other', icon: '◉', x: x, y: y})
+    body: JSON.stringify({name: 'New Place', type: 'other', icon: '◉', path: []})
   })
   .then(function(r) { return r.json(); })
-  .then(function(p) { places.push(p); selectPlace(p.id); setStatus('Added at ' + x + ',' + y); })
+  .then(function(p) {
+    places.push(p);
+    selectPlace(p.id);
+    setStatus('Added — now draw its path');
+  })
   .catch(function() { setStatus('Add failed', true); });
-});
+}
 
 function savePlace() {
   var p = places.find(function(x) { return x.id === selectedPlace; });
@@ -289,7 +444,7 @@ function savePlace() {
   fetch('/api/places/' + p.id, {
     method: 'PUT', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({name: p.name, type: p.type, icon: p.icon, description: p.description})
-  }).then(function() { renderPlaces(); setStatus('Saved ' + p.name); })
+  }).then(function() { renderSvg(); renderPlaceList(); setStatus('Saved ' + p.name); })
     .catch(function() { setStatus('Save failed', true); });
 }
 
@@ -298,7 +453,8 @@ function deletePlace() {
   fetch('/api/places/' + selectedPlace, {method: 'DELETE'})
   .then(function() {
     places = places.filter(function(p) { return p.id !== selectedPlace; });
-    selectedPlace = null; renderPlaces(); setStatus('Deleted');
+    selectedPlace = null; drawMode = false;
+    renderSvg(); renderPlaceList(); setStatus('Deleted');
   }).catch(function() { setStatus('Delete failed', true); });
 }
 
@@ -493,7 +649,8 @@ Promise.all([
   places  = results[0];
   artists = results[1];
   acts    = results[2];
-  renderPlaces();
+  renderSvg();
+  renderPlaceList();
   renderArtistList();
   populateActSelects();
   renderActList();
