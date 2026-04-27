@@ -81,10 +81,35 @@
 (defonce place-display      (r/atom nil))
 (defonce place-content-anim (r/atom nil))
 
+(defn- animate-close-then! [f]
+  (reset! modal-closing true)
+  (js/setTimeout
+    (fn []
+      (reset! modal-place nil)
+      (reset! modal-artist nil)
+      (reset! place-display nil)
+      (reset! modal-day nil)
+      (reset! modal-closing false)
+      (f))
+    240))
+
+(defn open-artist! [artist]
+  (if @modal-place
+    (animate-close-then! #(reset! modal-artist artist))
+    (reset! modal-artist artist)))
+
 (defn switch-place! [new-place]
-  (if (nil? @place-display)
+  (cond
+    @modal-artist
+    (animate-close-then!
+      #(do (reset! place-display new-place)
+           (reset! modal-place new-place)))
+
+    (nil? @place-display)
     (do (reset! place-display new-place)
         (reset! modal-place new-place))
+
+    :else
     (do (reset! place-content-anim :out)
         (js/setTimeout
           (fn []

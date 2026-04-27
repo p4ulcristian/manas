@@ -85,8 +85,7 @@
                           :past? false
                           :on-artist-click (fn [e]
                                              (.stopPropagation e)
-                                             (reset! state/modal-artist
-                                                     (get artist-map (:artist-id a))))}])]
+                                             (state/open-artist! (get artist-map (:artist-id a))))}])]
       [:div.no-acts "Lineup TBA"])))
 
 ;; ── Place modal ───────────────────────────────────────────────────
@@ -142,7 +141,7 @@
                            (let [place (get place-map (:place-id act))]
                              (reset! state/modal-scroll-act-id (:id act))
                              (reset! state/modal-selected-act-id (:id act))
-                             (reset! state/modal-artist nil)
+                             
                              (reset! state/modal-day (:date act))
                              (state/switch-place! place)))}
               [cards/artist-schedule-card {:act act :place (get place-map (:place-id act))}]])
