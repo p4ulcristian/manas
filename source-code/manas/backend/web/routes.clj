@@ -44,18 +44,36 @@
   (json/parse-string (slurp (:body request)) true))
 
 (defn- build-version []
-  (try (clojure.string/trim (slurp (str project-root "/resources/version.txt")))
-       (catch Exception _ "0")))
+  (try
+    (let [files [(str project-root "/resources/public/css/main.css")
+                  (str project-root "/resources/public/js/core/main.js")]
+          mtime (apply max (map #(.lastModified (java.io.File. %)) files))]
+      (Long/toString mtime 36))
+    (catch Exception _ "0")))
 
 (defn- html-shell []
-  (let [v (build-version)]
+  (let [v    (build-version)
+        base (str "https://" (or (System/getenv "MANAS_DOMAIN") "manas.irisdoes.work"))
+        title "Manas Festival — Your Interactive Map & Live Program"
+        desc  "Navigate the grounds, discover stages and artists, track the live program, and find your next magical moment — all in one interactive map."
+        img   (str base "/images/og-image.jpg")]
     (str "<!DOCTYPE html>"
          (h/html
           [:html {:lang "en"}
            [:head
             [:meta {:charset "UTF-8"}]
             [:meta {:name "viewport" :content "width=device-width, initial-scale=1.0"}]
-            [:title "Festival Map"]
+            [:title title]
+            [:meta {:name "description" :content desc}]
+            [:meta {:property "og:type"        :content "website"}]
+            [:meta {:property "og:title"       :content title}]
+            [:meta {:property "og:description" :content desc}]
+            [:meta {:property "og:image"       :content img}]
+            [:meta {:property "og:url"         :content base}]
+            [:meta {:name "twitter:card"        :content "summary_large_image"}]
+            [:meta {:name "twitter:title"       :content title}]
+            [:meta {:name "twitter:description" :content desc}]
+            [:meta {:name "twitter:image"       :content img}]
             [:link {:rel "icon" :type "image/x-icon" :href (str "/favicon.ico?v=" v)}]
             [:link {:rel "icon" :type "image/png" :sizes "32x32" :href (str "/favicon-32x32.png?v=" v)}]
             [:link {:rel "icon" :type "image/png" :sizes "16x16" :href (str "/favicon-16x16.png?v=" v)}]

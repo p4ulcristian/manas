@@ -1,6 +1,13 @@
 (ns manas.frontend.views.map
   (:require [reagent.core :as r]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [manas.frontend.state :as state]
+            [manas.frontend.ui.modals :as modals]
+            [manas.frontend.ui.buttons :as btn]
+            [manas.frontend.ui.menu :as menu]
+            [manas.frontend.ui.panels.stages :as stages]
+            [manas.frontend.ui.panels.artists :as artists]
+            [manas.frontend.dev.controls :as dev]))
 
 ;; ── Image georeferencing ──────────────────────────────────────────
 (def img-w 1440)
@@ -32,6 +39,7 @@
 
 ;; ── Simulation route [lng lat] ────────────────────────────────────
 (defonce sim-route (r/atom []))
+(defonce trail     (r/atom []))
 
 ;; ── Point-in-polygon ──────────────────────────────────────────────
 (defn- inside-festival? [lng lat]
@@ -44,169 +52,10 @@
                            (< lng (+ (* (/ (- xj xi) (- yj yi)) (- lat yi)) xi)))]
           (recur (inc i) i (if cross? (not inside) inside)))))))
 
-;; ── State atoms ──────────────────────────────────────────────────
-(defonce api-places    (r/atom []))
-(defonce api-artists   (r/atom []))
-(defonce api-acts      (r/atom []))
-(defonce modal-place   (r/atom nil))
-(defonce modal-artist  (r/atom nil))
-(defonce modal-day     (r/atom nil))
-(defonce modal-closing (r/atom false))
-(defonce active-nav    (r/atom :stages))
-(defonce now-time      (r/atom (js/Date.now)))
-(.setInterval js/window #(reset! now-time (js/Date.now)) 30000)
+;; ── Nav state ────────────────────────────────────────────────────
+(defonce active-nav (r/atom :stages))
 
-(defn close-modal! []
-  (reset! modal-closing true)
-  (js/setTimeout (fn []
-                   (reset! modal-place nil)
-                   (reset! modal-closing false)) 240))
 
-(defn fetch-places! []
-  (-> (js/fetch "/api/places")
-      (.then #(.json %))
-      (.then #(reset! api-places (js->clj % :keywordize-keys true)))))
-
-(defn fetch-artists! []
-  (-> (js/fetch "/api/artists")
-      (.then #(.json %))
-      (.then #(reset! api-artists (js->clj % :keywordize-keys true)))))
-
-(defn fetch-acts! []
-  (-> (js/fetch "/api/acts")
-      (.then #(.json %))
-      (.then #(reset! api-acts (js->clj % :keywordize-keys true)))))
-
-;; ── Timetable helpers ─────────────────────────────────────────────
-(defn- act->ms [date-str time-str]
-  (when (seq time-str)
-    (let [[h m] (map js/parseInt (.split time-str ":"))
-          d     (js/Date. date-str)
-          h'    (if (< h 7) (+ h 24) h)]
-      (.setHours d h' m 0 0))))
-
-(defn- countdown [ms now]
-  (let [diff-m (/ (- ms now) 60000)
-        d      (Math/floor (/ diff-m 1440))
-        h      (Math/floor (mod (/ diff-m 60) 24))
-        m      (Math/round (mod diff-m 60))]
-    (cond
-      (pos? d) (str d "d " h "h")
-      (pos? h) (str h "h " m "m")
-      :else    (str m "min"))))
-
-(def ^:private day-labels
-  {"2026-07-08" "Wed" "2026-07-09" "Thu" "2026-07-10" "Fri"
-   "2026-07-11" "Sat" "2026-07-12" "Sun" "2026-07-13" "Mon"})
-
-;; ── Place timetable panel ─────────────────────────────────────────
-(defn- modal-acts [place-id day]
-  (let [artist-map (->> @api-artists (map (juxt :id identity)) (into {}))
-        day-acts   (->> @api-acts
-                        (filter #(and (= (:place-id %) place-id) (= (:date %) day)))
-                        (sort-by #(let [[h] (map js/parseInt (.split (:time %) ":"))]
-                                    (if (< h 7) (+ h 24) h))))
-        now        @now-time
-        dated      (mapv #(assoc % :ms (act->ms day (:time %))) day-acts)
-        past       (filterv #(and (:ms %) (< (:ms %) now)) dated)
-        future     (filterv #(or (nil? (:ms %)) (>= (:ms %) now)) dated)]
-    (if (seq day-acts)
-      [:div.place-modal__acts
-       (for [a past]
-         (let [artist (get artist-map (:artist-id a))]
-           [:div.place-modal__act.past {:key (:id a)}
-            [:span.place-modal__act-time (:time a)]
-            [:div.place-modal__act-info
-             [:span.place-modal__act-name
-              {:on-click (fn [e] (.stopPropagation e) (reset! modal-artist artist))
-               :style {:cursor "pointer"}}
-              (:name artist)]
-             (when (seq (:description artist))
-               [:span.place-modal__act-desc (:description artist)])]]))
-       [:div.place-modal__now-line
-        {:ref #(when % (js/setTimeout
-                         (fn [] (.scrollIntoView % #js {:behavior "smooth" :block "nearest"}))
-                         120))}
-        [:span.place-modal__now-label
-         (let [d (js/Date. @now-time)
-               h (.getHours d)
-               m (.getMinutes d)]
-           (str (when (< h 10) "0") h ":" (when (< m 10) "0") m))]]
-       (for [a future]
-         (let [artist (get artist-map (:artist-id a))]
-           [:div.place-modal__act {:key (:id a)}
-            [:span.place-modal__act-time (:time a)]
-            [:div.place-modal__act-info
-             [:span.place-modal__act-name
-              {:on-click (fn [e] (.stopPropagation e) (reset! modal-artist artist))
-               :style {:cursor "pointer"}}
-              (:name artist)]
-             (when (seq (:description artist))
-               [:span.place-modal__act-desc (:description artist)])]
-            (when (:ms a)
-              [:span.place-modal__act-countdown (countdown (:ms a) now)])]))]
-      [:div.place-modal__no-acts "Lineup TBA"])))
-
-;; ── Place modal ───────────────────────────────────────────────────
-(defn place-modal []
-  (when-let [p @modal-place]
-    (let [place-id (:id p)
-          dates    (->> @api-acts
-                        (filter #(= (:place-id %) place-id))
-                        (map :date)
-                        distinct
-                        sort)
-          active   (or @modal-day (first dates))]
-      [:div.place-modal
-       {:class (when @modal-closing "closing")}
-       [:div.place-modal__sheet
-        [:button.place-modal__close {:on-click close-modal!} "\u2715"]
-        [:div.place-modal__header
-         (if (:image-url p)
-           [:img.place-modal__img {:src (:image-url p) :alt (:name p)}]
-           [:span.place-modal__icon (or (:icon p) "O")])
-         [:span.place-modal__name (:name p)]]
-        [:div.place-modal__body
-         (when (seq (:description p))
-           [:div.place-modal__place-desc (:description p)])
-         (when (seq dates)
-           [:div.place-modal__days
-            (for [d dates]
-              [:div.place-modal__day-tab
-               {:key      d
-                :class    (when (= d active) "active")
-                :on-click (fn [e] (.stopPropagation e) (reset! modal-day d))}
-               [:span (get day-labels d d)]
-               [:span.place-modal__day-date (last (clojure.string/split d #"-"))]])])
-         (modal-acts place-id active)]]])))
-
-;; ── Artist modal ──────────────────────────────────────────────────
-(defn artist-modal []
-  (when-let [a @modal-artist]
-    (let [place-map (->> @api-places (map (juxt :id identity)) (into {}))
-          a-acts    (->> @api-acts
-                         (filter #(= (:artist-id %) (:id a)))
-                         (sort-by #(str (:date %) (:time %))))]
-      [:div.place-modal.artist-modal
-       {:on-click #(reset! modal-artist nil)}
-       [:div.place-modal__sheet
-        {:on-click #(.stopPropagation %)}
-        [:button.place-modal__close {:on-click #(reset! modal-artist nil)} "\u2715"]
-        [:div.place-modal__header
-         [:span.place-modal__name (:name a)]]
-        [:div.place-modal__artist-bio (:description a)]
-        [:div.place-modal__acts
-         (if (seq a-acts)
-           (for [act a-acts]
-             (let [place (get place-map (:place-id act))]
-               [:div.place-modal__act {:key (:id act)}
-                [:span.place-modal__act-time
-                 (str (get day-labels (:date act) (:date act)) " " (:time act))]
-                [:div.place-modal__act-info
-                 [:span.place-modal__act-name (:name place)]
-                 (when (:icon place)
-                   [:span.place-modal__act-stage-icon (:icon place)])]]))
-           [:div.place-modal__no-acts "No performances scheduled"])]]])))
 
 ;; ── Catmull-Rom smooth path ──────────────────────────────────────
 (defn- cr-seg [pts n i]
@@ -229,9 +78,53 @@
            (str/join " " (map #(cr-seg pts n %) (range n)))
            " Z"))))
 
+;; ── User position — barefoot footprints ─────────────────────
+(defn- foot-svg [mirror?]
+  [:svg {:view-box "0 0 10 16" :width 10 :height 16
+         :fill "#72ddd0"
+         :style {:transform (when mirror? "scaleX(-1)")
+                 :display "block"}}
+   [:ellipse {:cx 5 :cy 11 :rx 4 :ry 5}]
+   [:circle {:cx 2   :cy 5   :r 1.8}]
+   [:circle {:cx 4   :cy 3.5 :r 1.5}]
+   [:circle {:cx 6.5 :cy 3   :r 1.4}]
+   [:circle {:cx 8.5 :cy 4   :r 1.3}]
+   [:circle {:cx 9.5 :cy 5.5 :r 1.2}]])
+
+(defn- trail-dot [pos idx n]
+  (let [frac (/ (inc idx) n)
+        opacity (max 0.18 (* 0.65 frac))
+        size    (max 4 (* 7 frac))]
+    [:div {:key   idx
+           :style {:position      "absolute"
+                   :left          (first pos)
+                   :top           (second pos)
+                   :width         size
+                   :height        size
+                   :background    "#72ddd0"
+                   :border-radius "50%"
+                   :opacity       opacity
+                   :transform     "translate(-50%,-50%)"
+                   :pointer-events "none"}}]))
+
+(defn- user-footprints []
+  [:div.map-footprints
+   [:div.map-footprint.map-footprint--left  [foot-svg false]]
+   [:div.map-footprint.map-footprint--right [foot-svg true]]])
+
+;; ── Home marker ─────────────────────────────────────────────
+(defn- home-marker-dot []
+  (when-let [m @state/home-marker]
+    [:div.home-marker
+     {:class    (when @state/home-pulsing? "home-marker--pulse")
+      :style    {:position "absolute" :left (:x m) :top (:y m)
+                 :transform "translate(-50%,-100%)" :pointer-events "all"}
+      :on-click (fn [e] (.stopPropagation e) (state/clear-home-marker!))}
+     "\uD83C\uDFD5"]))
+
 ;; ── API place areas (SVG Catmull-Rom, pixel-positioned) ──────────
 (defn- place-click-handler [p]
-  (fn [e] (.stopPropagation e) (reset! modal-day nil) (reset! modal-place p)))
+  (fn [e] (.stopPropagation e) (reset! state/modal-day nil) (state/switch-place! p)))
 
 (defn- place-dot [p]
   [:div.place-btn
@@ -255,58 +148,63 @@
   [(/ (apply + (map first pts)) (count pts))
    (/ (apply + (map second pts)) (count pts))])
 
-(defn- place-radial-gradient [p]
+(defn- place-radial-gradient [p selected?]
   (let [pts    (:path p)
         [cx cy] (centroid pts)
         r      (apply max (map (fn [[x y]]
                                  (js/Math.sqrt (+ (* (- x cx) (- x cx))
                                                   (* (- y cy) (- y cy)))))
-                               pts))]
+                               pts))
+        c1     (if selected? "#ff7c2a" "#00a896")
+        c2     (if selected? "#ffaa55" "#00d4aa")]
     [:radialGradient {:key           (str "grad-" (:id p))
                       :id            (str "grad-" (:id p))
                       :gradientUnits "userSpaceOnUse"
                       :cx cx :cy cy :r (* r 1.4)}
-     [:stop {:key "s0" :offset "0%" :stop-color "#00a896" :stop-opacity "0.42"}
+     [:stop {:key "s0" :offset "0%" :stop-color c1 :stop-opacity (if selected? "0.55" "0.42")}
      [:animate {:attributeName "stop-color"
-                :values "#00a896;#00d4aa;#00a896"
+                :values (str c1 ";" c2 ";" c1)
                 :dur "10s" :calcMode "spline"
                 :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
                 :repeatCount "indefinite"}]]
-     [:stop {:key "s100" :offset "100%" :stop-color "#00a896" :stop-opacity "0"}
+     [:stop {:key "s100" :offset "100%" :stop-color c1 :stop-opacity "0"}
       [:animate {:attributeName "stop-color"
-                 :values "#00a896;#00d4aa;#00a896"
+                 :values (str c1 ";" c2 ";" c1)
                  :dur "10s" :calcMode "spline"
                  :keySplines "0.45 0 0.55 1;0.45 0 0.55 1"
                  :repeatCount "indefinite"}]]]))
 
-(defn- place-svg-area [p d]
-  [:path {:key          (:id p)
-          :class        "place-area"
-          :d            d
-          :fill         (str "url(#grad-" (:id p) ")")
-          :stroke       "#00a896"
-          :stroke-width 3
-          :filter       "url(#amorph)"
-          :on-click     (place-click-handler p)}
-   [:animate {:attributeName "stroke"
-              :values        "#00a896;#00d4aa;#00a896"
-              :dur           "10s" :calcMode "spline"
-              :keySplines    "0.45 0 0.55 1;0.45 0 0.55 1"
-              :repeatCount   "indefinite"}]])
+(defn- place-svg-area [p d selected?]
+  (let [c1 (if selected? "#ff7c2a" "#00a896")
+        c2 (if selected? "#ffaa55" "#00d4aa")]
+    [:path {:key          (:id p)
+            :class        "place-area"
+            :d            d
+            :fill         (str "url(#grad-" (:id p) ")")
+            :stroke       c1
+            :stroke-width (if selected? 4 3)
+            :filter       "url(#amorph)"
+            :on-click     (place-click-handler p)}
+     [:animate {:attributeName "stroke"
+                :values        (str c1 ";" c2 ";" c1)
+                :dur           "10s" :calcMode "spline"
+                :keySplines    "0.45 0 0.55 1;0.45 0 0.55 1"
+                :repeatCount   "indefinite"}]]))
 
 (defn place-areas []
-  (let [with-path (filter #(catmull-rom-path (:path %)) @api-places)
+  (let [with-path     (filter #(catmull-rom-path (:path %)) @state/api-places)
         with-path-ids (set (map :id with-path))
-        without-path  (remove #(with-path-ids (:id %)) @api-places)]
+        without-path  (remove #(with-path-ids (:id %)) @state/api-places)
+        selected-id   (:id @state/modal-place)]
     [:<>
      (for [p without-path] [place-dot p])
      [:svg {:style {:position "absolute" :left 0 :top 0
                     :width img-w :height img-h
                     :overflow "visible" :pointer-events "none"}}
       (into [:defs [amorph-filter]]
-            (map place-radial-gradient with-path))
+            (map #(place-radial-gradient % (= (:id %) selected-id)) with-path))
       (for [p with-path]
-        ^{:key (:id p)} [place-svg-area p (catmull-rom-path (:path p))])]]))
+        ^{:key (:id p)} [place-svg-area p (catmull-rom-path (:path p)) (= (:id p) selected-id)])]]))
 
 ;; ── Bottom nav ───────────────────────────────────────────────────
 (defn nav-menu []
@@ -370,7 +268,8 @@
         watch-id   (atom nil)
         sim-idx    (atom 0)
         anim-frame (atom nil)
-        node-ref   (atom nil)
+        node-ref      (atom nil)
+        doc-wheel-ref (atom nil)
 
         animate-px (fn [from to on-done]
                      (when @anim-frame (js/cancelAnimationFrame @anim-frame))
@@ -388,28 +287,62 @@
                                      (on-done))))]
                          (reset! anim-frame (js/requestAnimationFrame tick)))))
 
+        animate-to
+        (fn [target-x target-y]
+          (when @anim-frame (js/cancelAnimationFrame @anim-frame))
+          (let [t0     (js/performance.now)
+                dur    500
+                {:keys [x y scale]} @transform
+                from-x x
+                from-y y]
+            (letfn [(tick [now]
+                      (let [t  (min 1.0 (/ (- now t0) dur))
+                            e  (- (* 3 t t) (* 2 t t t))
+                            nx (+ from-x (* e (- target-x from-x)))
+                            ny (+ from-y (* e (- target-y from-y)))]
+                        (reset! transform (clamp-transform {:scale scale :x nx :y ny}))
+                        (when (< t 1.0)
+                          (reset! anim-frame (js/requestAnimationFrame tick)))))]
+              (reset! anim-frame (js/requestAnimationFrame tick)))))
+
+        center-on-place!
+        (fn [p]
+          (let [vw        (.-innerWidth js/window)
+                vh        (.-innerHeight js/window)
+                s         (:scale @transform)
+                [px py]   (if (and (:x p) (:y p))
+                            [(:x p) (:y p)]
+                            (centroid (:path p)))
+                modal-h   420
+                visible-h (- vh modal-h)
+                tx        (- (/ vw 2) (* px s))
+                ty        (- (/ visible-h 2) (* py s))]
+            (animate-to tx ty)))
+
         on-wheel
         (fn [e]
           (.preventDefault e)
-          (if (.-ctrlKey e)
-            (let [factor (if (> (.-deltaY e) 0) 0.9 1.1)
-                  cx     (.-clientX e)
-                  cy     (.-clientY e)
-                  {:keys [x y scale]} @transform
-                  ns     (* scale factor)
-                  nx     (- cx (* (- cx x) factor))
-                  ny     (- cy (* (- cy y) factor))]
-              (reset! transform (clamp-transform {:scale ns :x nx :y ny})))
-            (let [{:keys [x y scale]} @transform]
-              (reset! transform (clamp-transform
-                                  {:scale scale
-                                   :x (- x (.-deltaX e))
-                                   :y (- y (.-deltaY e))})))))
+          (when-not (or @state/modal-place @state/modal-artist)
+            (if (.-ctrlKey e)
+              (let [factor (if (> (.-deltaY e) 0) 0.9 1.1)
+                    cx     (.-clientX e)
+                    cy     (.-clientY e)
+                    {:keys [x y scale]} @transform
+                    ns     (* scale factor)
+                    nx     (- cx (* (- cx x) factor))
+                    ny     (- cy (* (- cy y) factor))]
+                (reset! transform (clamp-transform {:scale ns :x nx :y ny})))
+              (let [{:keys [x y scale]} @transform]
+                (reset! transform (clamp-transform
+                                    {:scale scale
+                                     :x (- x (.-deltaX e))
+                                     :y (- y (.-deltaY e))}))))))
 
         on-touch-move
         (fn [e]
-          (.preventDefault e)
-          (let [touches (.-touches e)
+          (when-not (or @state/modal-place @state/modal-artist)
+            (.preventDefault e)
+            (let [touches (.-touches e)
                 tr      @touch-ref]
             (cond
               (and (:dragging tr) (= (.-length touches) 1))
@@ -435,7 +368,7 @@
                     nx  (- mx (* (- (:pinch-cx tr) x) f))
                     ny  (- my (* (- (:pinch-cy tr) y) f))]
                 (swap! touch-ref assoc :pinch-dist d :pinch-cx mx :pinch-cy my)
-                (reset! transform (clamp-transform {:scale ns :x nx :y ny}))))))]
+                (reset! transform (clamp-transform {:scale ns :x nx :y ny})))))))]
 
     (r/create-class
      {:component-did-mount
@@ -446,9 +379,9 @@
               tx (/ (- vw (* img-w s)) 2)
               ty (/ (- vh (* img-h s)) 2)]
           (reset! transform {:x tx :y ty :scale s}))
-        (fetch-places!)
-        (fetch-artists!)
-        (fetch-acts!)
+        (state/fetch-places!)
+        (state/fetch-artists!)
+        (state/fetch-acts!)
         (-> (js/fetch "/api/map-version")
             (.then #(.text %))
             (.then #(reset! map-ver %)))
@@ -457,10 +390,19 @@
             (.then #(reset! sim-route (js->clj % :keywordize-keys false))))
         (when-let [node @node-ref]
           (.addEventListener node "wheel" on-wheel #js {:passive false})
-          (.addEventListener node "touchmove" on-touch-move #js {:passive false})))
+          (.addEventListener node "touchmove" on-touch-move #js {:passive false}))
+        (add-watch state/modal-place ::center-map
+          (fn [_ _ _ new-place]
+            (when new-place (center-on-place! new-place))))
+        (let [handler (fn [e] (when (.-ctrlKey e) (.preventDefault e)))]
+          (reset! doc-wheel-ref handler)
+          (.addEventListener js/document "wheel" handler #js {:passive false})))
 
       :component-will-unmount
       (fn [_]
+        (remove-watch state/modal-place ::center-map)
+        (when @doc-wheel-ref
+          (.removeEventListener js/document "wheel" @doc-wheel-ref))
         (when-let [node @node-ref]
           (.removeEventListener node "wheel" on-wheel)
           (.removeEventListener node "touchmove" on-touch-move))
@@ -543,6 +485,7 @@
                         to   [(lng->px lng) (lat->py lat)]
                         from (or @user-pos to)]
                     (reset! sim-idx idx)
+                    (swap! trail conj to)
                     (animate-px from to #(walk-step (inc idx))))))
 
               start-sim
@@ -550,6 +493,7 @@
                 (when @watch-id (.clearWatch (.-geolocation js/navigator) @watch-id))
                 (when @anim-frame (js/cancelAnimationFrame @anim-frame))
                 (reset! sim-idx 0)
+                (reset! trail [])
                 (swap! state assoc :gps-status :found :sim-done? false)
                 (let [[lng lat] (first @sim-route)]
                   (reset! user-pos [(lng->px lng) (lat->py lat)]))
@@ -559,12 +503,14 @@
               (fn []
                 (when @anim-frame (js/cancelAnimationFrame @anim-frame))
                 (reset! sim-idx 0)
+                (reset! trail [])
                 (reset! user-pos nil)
                 (swap! state assoc :gps-status :idle :sim-done? false))]
 
           [:section#garden.map-section
            [:div.map-viewport
             {:ref            #(reset! node-ref %)
+             :class          (when (or @state/modal-place @state/modal-artist) "map-locked")
              :on-touch-start on-touch-start
              :on-touch-end   on-touch-end
              :on-mouse-down  on-mouse-down
@@ -576,31 +522,40 @@
              {:style {:transform (str "translate(" x "px," y "px) scale(" scale ")")
                       :transform-origin "0 0"
                       :width img-w :height img-h}
-              :on-click #(when (and @modal-place (not (:mouse-moved @touch-ref))) (close-modal!))}
+              :on-click (fn [e]
+                          (cond
+                            @state/placing-home?
+                            (let [{mx :x my :y ms :scale} @transform
+                                  px (/ (- (.-clientX e) mx) ms)
+                                  py (/ (- (.-clientY e) my) ms)]
+                              (state/set-home-marker! px py))
+                            (and (or @state/modal-place @state/modal-artist)
+                                 (not (:mouse-moved @touch-ref)))
+                            (state/close-modal!)))}
              [:img {:src (str "/images/festival-map.png?v=" @map-ver)
                     :width img-w :height img-h
                     :draggable false
                     :style {:display "block" :user-select "none"}}]
+             (let [tpos @trail n (count tpos)]
+               (map-indexed (fn [i p] (trail-dot p i n)) tpos))
              (when upos
                [:div.map-user-dot
                 {:style {:position "absolute"
                          :left (first upos) :top (second upos)
-                         :transform "translate(-50%,-50%)"}}])
-             (place-areas)]]
-           [place-modal]
-           [artist-modal]
-           #_[nav-menu]
+                         :transform "translate(-50%,-50%)"}}
+                [user-footprints]])
+             (place-areas)
+             [home-marker-dot]]]
+           [modals/place-modal]
+           [modals/artist-modal]
+           (when @state/placing-home?
+             [:div.placement-hint "\uD83C\uDFD5 Tap the map to place your camp"])
+           [stages/stages-panel]
+           [artists/artists-panel]
+           [menu/bottom-nav]
 
            (when dev?
-             [:div.map-overlay__actions
-              [:button.map-btn {:on-click start-gps}
-               (case gps-status
-                 :idle    "\u25ce Locate me"
-                 :loading "Searching\u2026"
-                 :found   (if inside? "\u2713 You are here" "\u26a0 Outside festival")
-                 :error   "GPS unavailable"
-                 "\u25ce Locate me")]
-              [:button.map-btn.map-btn--sim {:on-click start-sim}
-               (if sim-done? "\u21ba Again" "\u25b6 Simulate")]
-              (when (and (pos? @sim-idx) (not sim-done?))
-                [:button.map-btn.map-btn--stop {:on-click stop-sim} "\u25fc Stop"])])]))})))
+             [dev/dev-controls
+              {:gps-status gps-status :inside? inside? :sim-done? sim-done?
+               :sim-idx @sim-idx
+               :on-locate start-gps :on-simulate start-sim :on-stop stop-sim}])]))})))
