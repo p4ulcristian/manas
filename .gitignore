@@ -1,7 +1,22 @@
+# env / runtime
 .env
 .env.dev
 .manas.pid
+.nrepl-port
+
+# shadow-cljs runtime state
 .shadow-cljs/
-resources/public/js/core/
+
+# compiled ClojureScript output
+resources/public/js/
+
+# deps caches
 node_modules/
+.cpcache/
 target/
+
+# playwright screenshots / runtime
+.playwright-mcp/
+
+# audit log (runtime generated)
+audit/
