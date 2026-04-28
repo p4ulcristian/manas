@@ -12,29 +12,26 @@
 (defn act-card [{:keys [act artist past? on-artist-click]}]
   (let [scroll? (= (:id act) @state/modal-scroll-act-id)]
     [:div.act-card
-     {:class (cond (= (:id act) @state/modal-selected-act-id) "act-card--selected"
-            past? "act-card--past")
-      :key   (:id act)
-      :ref   (when scroll?
-               (fn [el]
-                 (when el
-                   (reset! state/modal-scroll-act-id nil)
-                   (js/setTimeout
-                     (fn []
-                       (when-let [body (.closest el ".place-modal__body")]
-                         (let [el-top   (.. el getBoundingClientRect -top)
-                               body-top (.. body getBoundingClientRect -top)
-                               cur      (.-scrollTop body)
-                               target   (-> (+ cur (- el-top body-top)) (- 60) (max 0))]
-                           (.scrollTo body #js {:top target :behavior "smooth"}))))
-                     300))))}
+     {:class    (cond (= (:id act) @state/modal-selected-act-id) "act-card--selected"
+                      past? "act-card--past")
+      :key      (:id act)
+      :on-click (when on-artist-click on-artist-click)
+      :ref      (when scroll?
+                  (fn [el]
+                    (when el
+                      (reset! state/modal-scroll-act-id nil)
+                      (js/setTimeout
+                        (fn []
+                          (when-let [body (.closest el ".place-modal__body")]
+                            (let [el-top   (.. el getBoundingClientRect -top)
+                                  body-top (.. body getBoundingClientRect -top)
+                                  cur      (.-scrollTop body)
+                                  target   (-> (+ cur (- el-top body-top)) (- 60) (max 0))]
+                              (.scrollTo body #js {:top target :behavior "smooth"}))))
+                        300))))}
      [:span.act-card__time (:time act)]
      [:div.act-card__info
-      [:span.act-card__name
-       (cond-> {}
-         on-artist-click (assoc :class "act-card__name--clickable"
-                                :on-click on-artist-click))
-       (:name artist)]
+      [:span.act-card__name (:name artist)]
       (when (seq (:description artist))
         [:span.act-card__desc (:description artist)])]
      (when (:ms act)

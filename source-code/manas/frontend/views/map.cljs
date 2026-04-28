@@ -113,14 +113,28 @@
    [:div.map-footprint.map-footprint--right [foot-svg true]]])
 
 ;; ── Home marker ─────────────────────────────────────────────
+(defn- tent-svg []
+  [:svg {:xmlns "http://www.w3.org/2000/svg" :viewBox "0 0 256 256"
+         :width "100%" :height "100%" :fill "currentColor"}
+   [:path {:d "M255.31,188.75l-64-144A8,8,0,0,0,184,40H72a8,8,0,0,0-7.31,4.75h0l0,.12v0L.69,188.75A8,8,0,0,0,8,200H248a8,8,0,0,0,7.31-11.25ZM64,184H20.31L64,85.7Zm16,0V85.7L123.69,184Z"}]])
+
 (defn- home-marker-dot []
-  (when-let [m @state/home-marker]
-    [:div.home-marker
-     {:class    (when @state/home-pulsing? "home-marker--pulse")
-      :style    {:position "absolute" :left (:x m) :top (:y m)
-                 :transform "translate(-50%,-100%)" :pointer-events "all"}
-      :on-click (fn [e] (.stopPropagation e) (state/clear-home-marker!))}
-     "\uD83C\uDFD5"]))
+  (r/with-let [selected? (r/atom false)
+               dismiss   (fn [_] (reset! selected? false))
+               _         (.addEventListener js/document "click" dismiss)]
+    (when-let [m @state/home-marker]
+      [:div.home-marker-wrap
+       {:style {:position "absolute" :left (:x m) :top (:y m)}}
+       [:div.home-marker-inner
+        (when @selected?
+          [:div.home-marker-delete
+           {:on-click (fn [e] (.stopPropagation e) (state/clear-home-marker!))}
+           "\u2715 Remove camp"])
+        [:div.home-marker
+         {:class    (when @selected? "home-marker--selected")
+          :on-click (fn [e] (.stopPropagation e) (swap! selected? not))}
+         [tent-svg]]]])
+    (finally (.removeEventListener js/document "click" dismiss))))
 
 ;; ── API place areas (SVG Catmull-Rom, pixel-positioned) ──────────
 (defn- place-click-handler [p]
