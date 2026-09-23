@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 
 PROFILE="${MANAS_PROFILE:-p4ulcristian}"
 SOPS_FILE="secrets/${PROFILE}.sops.yaml"
-SOPS=$(which sops 2>/dev/null || find /nix/store -maxdepth 4 -name "sops" -type f 2>/dev/null | head -1)
+SOPS=$(which sops 2>/dev/null || echo "$HOME/.local/bin/sops")
 
 if [ -z "$SOPS" ]; then
   echo "Error: sops not found."
