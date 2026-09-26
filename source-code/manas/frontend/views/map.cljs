@@ -10,12 +10,16 @@
             [manas.frontend.dev.controls :as dev]))
 
 ;; ── Image georeferencing ──────────────────────────────────────────
-(def img-w 1440)
-(def img-h 1920)
-(def img-north 46.26629084547643)
-(def img-south 46.25869538678212)
-(def img-west  20.133819580078125)
-(def img-east  20.1434326171875)
+;; Calibrated 2026-07-09 against the real Kek-to lake (OpenStreetMap, way
+;; 153784980) visible on the map: lake pixel bbox (707,1003)-(1312,1747)
+;; matched to its real lat/lng bbox. Previously this pointed at Szeged
+;; (leftover dev/test coordinates) instead of the actual Lengyeltoti site.
+(def img-w 1785)
+(def img-h 2525)
+(def img-north 46.67558932701613)
+(def img-south 46.66982153467742)
+(def img-west  17.656243444132233)
+(def img-east  17.66265292181818)
 
 (defn lng->px [lng]
   (* (/ (- lng img-west) (- img-east img-west)) img-w))
@@ -24,18 +28,22 @@
   (* (/ (- img-north lat) (- img-north img-south)) img-h))
 
 ;; ── Festival boundary [lng lat] ───────────────────────────────────
+;; Approximate polygon traced from the map's illustrated outline (core area,
+;; excluding the standalone Zone 1 parking strip) and converted through the
+;; calibration above. Good enough for the "inside the festival" indicator;
+;; not survey-precise.
 (def boundary
-  [[20.137585729121383 46.26232807355396]
-   [20.13773635992962  46.26155743394304]
-   [20.138532551345605 46.2609296075656]
-   [20.13935456518732  46.261001019459144]
-   [20.139651523066135 46.26081356304036]
-   [20.140400373371932 46.26094448505103]
-   [20.14081353216045  46.2614175869837]
-   [20.140912518120842 46.26236080318151]
-   [20.139259882964552 46.2625928854367]
-   [20.138257112153724 46.26266131976024]
-   [20.137602944070693 46.26225368796318]])
+  [[17.658757  46.6748355]
+   [17.6598342 46.6748584]
+   [17.660301  46.6746756]
+   [17.6611628 46.6746299]
+   [17.6612346 46.6735335]
+   [17.6609114 46.6726198]
+   [17.6612346 46.6718203]
+   [17.6598342 46.6713634]
+   [17.658757  46.6715918]
+   [17.6584697 46.6723913]
+   [17.6585774 46.6739903]])
 
 ;; ── Simulation route [lng lat] ────────────────────────────────────
 (defonce sim-route (r/atom []))
@@ -402,6 +410,23 @@
         (-> (js/fetch "/api/sim-route")
             (.then #(.json %))
             (.then #(reset! sim-route (js->clj % :keywordize-keys false))))
+        ;; Real GPS tracking is the whole point of the map, so start it for
+        ;; every visitor on mount instead of gating it behind the /dev-only
+        ;; locate button (that button remains for manual re-center in dev).
+        (swap! state assoc :gps-status :loading)
+        (reset! watch-id
+                (.watchPosition
+                 (.-geolocation js/navigator)
+                 (fn [pos]
+                   (let [lat  (.. pos -coords -latitude)
+                         lng  (.. pos -coords -longitude)
+                         to   [(lng->px lng) (lat->py lat)]
+                         from (or @user-pos to)]
+                     (swap! state assoc :gps-status :found
+                            :inside? (inside-festival? lng lat))
+                     (animate-px from to (fn []))))
+                 (fn [_] (swap! state assoc :gps-status :error))
+                 #js {:enableHighAccuracy true}))
         (when-let [node @node-ref]
           (.addEventListener node "wheel" on-wheel #js {:passive false})
           (.addEventListener node "touchmove" on-touch-move #js {:passive false}))
