@@ -8,7 +8,7 @@
            [java.io File]
            [java.nio.file Files Paths]))
 
-(def ^:private project-root "/home/p4ulcristian/work/manas")
+(def ^:private project-root "/home/iris/work/manas")
 (def ^:private places-path  (str project-root "/resources/places.edn"))
 (def ^:private artists-path (str project-root "/resources/artists.edn"))
 (def ^:private acts-path      (str project-root "/resources/acts.edn"))
@@ -311,7 +311,7 @@
 
       (and (= uri "/admin") (= method :get))
       {:status 200 :headers {"Content-Type" "text/html; charset=utf-8"}
-       :body (slurp "/home/p4ulcristian/work/manas/resources/public/admin.html")}
+       :body (slurp (str project-root "/resources/public/admin.html"))}
 
       (and (= uri "/api/places") (= method :get))
       (handle-get-places request)
